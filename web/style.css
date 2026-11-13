@@ -68,6 +68,14 @@ body {
 .sq.sel::before { background: var(--sel); }
 .sq.check { background-image: var(--check); }
 
+/* 重ね合わせの更新で種類が減った駒 */
+.sq.collapsed, .cap.collapsed { animation: collapse 0.9s ease-out both; }
+@keyframes collapse {
+  0% { box-shadow: inset 0 0 0 3px rgba(90, 190, 255, 0), inset 0 0 0 rgba(90, 190, 255, 0); }
+  30% { box-shadow: inset 0 0 0 3px rgba(90, 190, 255, 0.95), inset 0 0 22px rgba(90, 190, 255, 0.85); }
+  100% { box-shadow: inset 0 0 0 3px rgba(90, 190, 255, 0.7), inset 0 0 12px rgba(90, 190, 255, 0.4); }
+}
+
 .sq.target::after {
   content: "";
   position: absolute;
@@ -96,17 +104,34 @@ body {
 .sq.light .coord { color: var(--dark); }
 .sq.dark .coord { color: var(--light); }
 
+/* 駒: 重ね合わせの各種類 (.g) を中央に半透明で重ね、ホバー・選択時は円形に並べる */
 .piece {
-  position: relative;
+  position: absolute;
+  inset: 0;
   z-index: 1;
   pointer-events: none;
 }
-.piece.w {
+.piece .g {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+.piece.super .g { opacity: calc(0.12 + 0.88 / var(--n)); }
+.sq:hover .piece.super .g,
+.sq.sel .piece.super .g,
+.cap:hover .piece.super .g {
+  --a: calc(var(--i) / var(--n) * 1turn);
+  opacity: 1;
+  transform: translate(-50%, -50%) rotate(var(--a)) translateY(-0.36em) rotate(calc(-1 * var(--a))) scale(0.5);
+}
+.piece.w, .glyph.w {
   color: #fff;
   -webkit-text-stroke: 1.2px #222;
   text-shadow: 0 2px 2px rgba(0, 0, 0, 0.35);
 }
-.piece.b {
+.piece.b, .glyph.b {
   color: #1b1b1b;
   -webkit-text-stroke: 0.6px #000;
   text-shadow: 0 2px 2px rgba(0, 0, 0, 0.25);
@@ -117,9 +142,29 @@ body {
   position: fixed;
   z-index: 100;
   pointer-events: none;
+  width: 1.3em;
+  height: 1.3em;
   transform: translate(-50%, -50%);
   font-size: min(10vw, 60px);
   line-height: 1;
+}
+
+/* 取られた駒 */
+.captured {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-height: 34px;
+  padding: 3px 0;
+}
+.cap {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  font-size: 26px;
+  line-height: 1;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .status {
@@ -139,7 +184,9 @@ body {
   border-radius: 8px;
   padding: 16px 18px;
 }
-.panel h1 { font-size: 1.15rem; margin: 0 0 12px; }
+.panel h1 { font-size: 1.15rem; margin: 0; }
+.title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 12px; }
+.title-row select { padding: 3px 6px; font-size: 0.85rem; }
 
 fieldset {
   border: 1px solid #3c4046;
@@ -185,7 +232,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
   font-size: 0.9rem;
 }
 .moves li { padding: 1px 0; }
-.moves span { display: inline-block; width: 6em; }
+.moves span { display: inline-block; min-width: 9.5em; }
 
 .footer { margin-top: 14px; }
 .footer a { color: var(--accent); }
@@ -197,5 +244,11 @@ dialog {
   border-radius: 8px;
 }
 dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
-.promo-choices { display: flex; gap: 8px; justify-content: center; }
-.promo-choices button { font-size: 40px; line-height: 1; padding: 6px 10px; background: var(--light); }
+.choice-buttons { display: flex; flex-direction: column; gap: 6px; }
+.choice-buttons button { display: flex; align-items: center; gap: 8px; text-align: left; }
+.choice-buttons .glyph { font-size: 28px; line-height: 1; }
+
+.rules { margin-top: 12px; }
+.rules summary { cursor: pointer; color: var(--muted); }
+.rules ul { padding-left: 1.2em; margin: 6px 0; }
+.rules li { margin: 3px 0; }

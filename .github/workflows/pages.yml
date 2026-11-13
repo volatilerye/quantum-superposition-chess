@@ -24,11 +24,7 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Test rules core (perft)
+      - name: Test rules core and engine
         run: cargo test --release
 
       - name: Build site

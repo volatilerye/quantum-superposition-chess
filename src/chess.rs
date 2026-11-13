@@ -28,15 +28,15 @@ pub fn color(p: u8) -> u8 {
     p & 8
 }
 #[inline]
-fn file(sq: u8) -> i8 {
+pub fn file(sq: u8) -> i8 {
     (sq % 8) as i8
 }
 #[inline]
-fn rank(sq: u8) -> i8 {
+pub fn rank(sq: u8) -> i8 {
     (sq / 8) as i8
 }
 #[inline]
-fn at(f: i8, r: i8) -> Option<u8> {
+pub fn at(f: i8, r: i8) -> Option<u8> {
     if (0..8).contains(&f) && (0..8).contains(&r) {
         Some((r * 8 + f) as u8)
     } else {

@@ -1,72 +1,94 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Rust × Stockfish チェス</title>
+  <title>Quantum Superposition Chess</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main class="layout">
     <section class="board-wrap">
-      <div id="board" class="board" aria-label="チェス盤"></div>
-      <div id="status" class="status">読み込み中…</div>
+      <div id="captured-top" class="captured"></div>
+      <div id="board" class="board" data-i18n-aria="boardLabel" aria-label="Chess board"></div>
+      <div id="captured-bottom" class="captured"></div>
+      <div id="status" class="status" data-i18n="loading">Loading…</div>
     </section>
 
     <aside class="panel">
-      <h1>Rust × Stockfish チェス</h1>
+      <div class="title-row">
+        <h1 data-i18n="pageTitle">Quantum Superposition Chess</h1>
+        <select id="lang" aria-label="Language / 言語">
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+        </select>
+      </div>
 
       <fieldset>
-        <legend>新しい対局</legend>
+        <legend data-i18n="newGame">New game</legend>
         <div class="row">
-          <label>手番
-            <select id="color">
-              <option value="w">白（先手）</option>
-              <option value="b">黒（後手）</option>
-              <option value="r">ランダム</option>
+          <label><span data-i18n="opponent">Opponent</span>
+            <select id="opponent">
+              <option value="engine" data-i18n="optEngine">Engine</option>
+              <option value="human" data-i18n="optHuman">Human (same screen, taking turns)</option>
             </select>
           </label>
-          <button id="new-game" class="primary">対局開始</button>
+        </div>
+        <div class="row">
+          <label id="color-box"><span data-i18n="side">Play as</span>
+            <select id="color">
+              <option value="w" data-i18n="optWhite">White (moves first)</option>
+              <option value="b" data-i18n="optBlack">Black (moves second)</option>
+              <option value="r" data-i18n="optRandom">Random</option>
+            </select>
+          </label>
+          <button id="new-game" class="primary" data-i18n="start">Start</button>
         </div>
       </fieldset>
 
       <fieldset>
-        <legend>相手の強さ</legend>
-        <div id="elo-box" class="slider-box">
-          <input id="elo" type="range" min="1320" max="3190" step="10" value="1500">
-          <div class="slider-label">Elo <b id="elo-val">1500</b></div>
-          <label class="inline">思考時間
-            <select id="movetime">
-              <option value="1000" selected>1 秒</option>
-              <option value="2000">2 秒</option>
-              <option value="3000">3 秒</option>
-              <option value="4000">4 秒</option>
-              <option value="5000">5 秒</option>
-            </select>
-          </label>
-        </div>
-        <p class="muted small">変更は次の手から反映されます。</p>
+        <legend data-i18n="engine">Engine</legend>
+        <label class="inline"><span data-i18n="thinkTime">Thinking time</span>
+          <select id="movetime">
+            <option value="1000" data-i18n="seconds" data-n="1" selected>1 s</option>
+            <option value="2000" data-i18n="seconds" data-n="2">2 s</option>
+            <option value="3000" data-i18n="seconds" data-n="3">3 s</option>
+            <option value="4000" data-i18n="seconds" data-n="4">4 s</option>
+            <option value="5000" data-i18n="seconds" data-n="5">5 s</option>
+          </select>
+        </label>
+        <p class="muted small" data-i18n="changeNote">Changes take effect from the next move.</p>
       </fieldset>
 
       <div class="row buttons">
-        <button id="undo">待った</button>
-        <button id="flip">盤を反転</button>
-        <button id="copy-pgn">PGN をコピー</button>
+        <button id="undo" data-i18n="undo">Undo</button>
+        <button id="flip" data-i18n="flip">Flip board</button>
+        <button id="copy-pgn" data-i18n="copy">Copy game record</button>
       </div>
 
       <div id="eval" class="eval muted small"></div>
       <ol id="moves" class="moves"></ol>
 
-      <p class="muted small footer">
-        ルール判定: Rust → WebAssembly / 思考エンジン:
-        <a href="https://github.com/nmrugg/stockfish.js">Stockfish.js</a>（GPLv3）
-      </p>
+      <details class="rules small">
+        <summary data-i18n="rules">Rules</summary>
+        <ul>
+          <li data-i18n="rule1"></li>
+          <li data-i18n="rule2"></li>
+          <li data-i18n="rule3"></li>
+          <li data-i18n="rule4"></li>
+          <li data-i18n="rule5"></li>
+          <li data-i18n="rule6"></li>
+        </ul>
+        <p class="muted" data-i18n="hoverNote"></p>
+      </details>
+
+      <p class="muted small footer"><span data-i18n="footer">Rules &amp; engine: Rust → WebAssembly</span><br>Thanks to Claude Code!</p>
     </aside>
   </main>
 
-  <dialog id="promo">
-    <p>成る駒を選んでください</p>
-    <div id="promo-choices" class="promo-choices"></div>
+  <dialog id="choice">
+    <p id="choice-title"></p>
+    <div id="choice-buttons" class="choice-buttons"></div>
   </dialog>
 
   <script type="module" src="app.js"></script>

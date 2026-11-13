@@ -1,10 +1,11 @@
-// Rust 製ルールコア (chess_core.wasm) のラッパー。
+// Rust 製ルールコア + エンジン (chess_core.wasm) のラッパー。
 // wasm-bindgen を使わないので、文字列は線形メモリ上のバッファ経由でやり取りする。
 
 export async function loadRules(url) {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`${url} の読み込みに失敗しました (${res.status})`);
-  const { instance } = await WebAssembly.instantiate(await res.arrayBuffer(), {});
+  if (!res.ok) throw new Error(`failed to load ${url} (${res.status})`);
+  const imports = { env: { now_ms: () => performance.now() } };
+  const { instance } = await WebAssembly.instantiate(await res.arrayBuffer(), imports);
   const e = instance.exports;
   const enc = new TextEncoder();
   const dec = new TextDecoder();
@@ -19,24 +20,40 @@ export async function loadRules(url) {
   const get = (len) => (len ? dec.decode(new Uint8Array(e.memory.buffer, e.output_ptr(), len)) : "");
   const list = (s) => (s ? s.split(" ") : []);
 
-  const STATUS = ["ongoing", "checkmate", "stalemate", "fifty", "threefold", "insufficient"];
+  const STATUS = ["ongoing", "checkmate", "stalemate", "fifty", "threefold", "insufficient", "kingCaptured", "kingRevealed"];
 
   return {
     newGame: () => e.new_game(),
-    loadFen: (fen) => e.load_fen(put(fen)) === 1,
-    /** UCI 手を指す。成功なら SAN、不正なら null */
-    play: (uci) => get(e.play(put(uci))) || null,
+    /** 手 (e2e4 / 成り e7e8q / キャスリング e1g1c / アンパッサン e5d6e) を指す。成功なら表記、不正なら null */
+    play: (code) => get(e.play(put(code))) || null,
     undo: () => e.undo() === 1,
     legalMoves: () => list(get(e.legal_moves())),
-    fen: () => get(e.fen()),
-    initialFen: () => get(e.initial_fen()),
-    isStartPosition: () => e.is_start_position() === 1,
     history: () => list(get(e.move_history())),
-    sanHistory: () => list(get(e.san_history())),
-    /** 64 文字 (a1..h8)。大文字 = 白、小文字 = 黒、'.' = 空き */
-    board: () => get(e.board()),
+    notations: () => list(get(e.notation_history())).map((s) => s.replaceAll("_", " ")),
+    /** 64 要素 (a1..h8)。"." = 空き、それ以外は色 (w/b) + ありうる種類 (pnbrqk) */
+    board: () => get(e.board()).split(" "),
+    captured: () => list(get(e.captured())),
+    /**
+     * 直前の手を「重ね合わせを更新する前」の状態で見せるための情報 (初手前は null)。
+     * board / captured は board() / captured() と同じ形式で、種類だけ指す前のもの。
+     * changed は種類が減った盤上の駒のマス、changedCaptured は種類が減った取られた駒の captured() での位置。
+     */
+    preview: () => {
+      const s = get(e.preview());
+      if (!s) return null;
+      const [board, captured, changed, changedCaptured] = s.split("\n");
+      return { board: board.split(" "), captured: list(captured), changed: list(changed).map(Number), changedCaptured: list(changedCaptured).map(Number) };
+    },
     turn: () => (e.side_to_move() ? "b" : "w"),
     inCheck: () => e.in_check() === 1,
+    /** "checkmate" と "kingCaptured" は手番側の負け、"kingRevealed" は直前に指した側の負け */
     status: () => STATUS[e.status()] ?? "ongoing",
+    /** 現局面を ms ミリ秒探索。{ move, score (手番側から見た centipawn), depth } か null */
+    search: (ms) => {
+      const s = get(e.search(ms));
+      if (!s) return null;
+      const [move, score, depth] = s.split(" ");
+      return { move, score: Number(score), depth: Number(depth) };
+    },
   };
 }

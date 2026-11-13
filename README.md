@@ -1,27 +1,44 @@
-# Rust × Stockfish チェス (GitHub Pages)
+# 量子重ね合わせチェス (GitHub Pages)
 
-ブラウザだけで Stockfish と対局できる静的サイトです。
+ブラウザだけで遊べる「量子重ね合わせチェス」です。ルール判定も思考エンジンも Rust → WebAssembly で動きます。
 
-- **ルール判定**: Rust で書いた依存ゼロのチェスコア (`src/chess.rs`) を `wasm32-unknown-unknown` にビルド
-  - 合法手生成 / キャスリング / アンパッサン / 成り / SAN 表記
-  - チェックメイト・ステイルメイト・50 手・千日手 (3 回)・駒不足
-  - perft で検証済み (初期局面 d4, Kiwipete d3, CPW position 3–5)
-- **思考エンジン**: [Stockfish.js](https://github.com/nmrugg/stockfish.js) のシングルスレッド lite 版を Web Worker で実行
-- **強さ調整**
-  - Elo 1320–3190 を指定 (`UCI_LimitStrength` + `UCI_Elo`)
-  - 思考時間は 1〜5 秒から選択
+## ルール (通常のチェスとの違い)
+
+- 初期配置の駒はすべて、ポーン・ナイト・ビショップ・ルーク・クイーン・キングの重ね合わせ
+- 駒は重ね合わせのどれか 1 種類として動き、動いた後はその動きと矛盾する種類が除外される
+  (例: ナイトの跳び方をしたらナイトに確定、e2-e4 ならポーン・ルーク・クイーンのいずれか)
+- 各色の駒は初期配置の駒数 (P8 N2 B2 R2 Q1 K1) に割り当てられなければならず、
+  どの割り当てでもありえない種類は動いていない駒・取られた駒からも除外される
+  (成った駒は元の役割がポーンとして数える)
+- チェックはキングに確定した駒にだけ適用 (「利き」は相手の駒のありうる種類すべてで判定)。
+  相手の盤上の駒のどれもキングでありえなくなったら (= キングを取ったら) 勝ち。
+  自分の手で自分の盤上の駒のどれもキングでありえなくなったら (= 取られた駒がキングだったと確定させたら)、
+  その手を指した時点で負け (棋譜では `†`)
+- キャスリング: 未移動の e1/e8 のキング候補と未移動の隅のルーク候補で可。指すとキングとルークに確定
+- アンパッサン: 直前にポーンとして 2 マス進めた駒をポーンとして取る。取った駒・取られた駒ともポーンに確定
+- ポーンとして最終段に入る手は成り。同じマスへの「ポーン以外としての移動」とは別の手として選べる
+
+## 実装
+
+- **ルール** (`src/quantum.rs`): 駒ごとに「ありうる種類」の 6bit マスクを持つ。
+  駒数制約は Hall の条件 (種類の部分集合 64 通り) で判定し、ちょうど埋まった集合から除外する種類を求める
+- **エンジン** (`src/engine.rs`): 反復深化 αβ + 静止探索。重ね合わせの駒はありうる種類の平均の駒価値で評価。
+  Web Worker 上で動かし、思考時間 (1〜5 秒) で強さを調整
+- **UI**: 重ね合わせの駒は各種類を半透明で重ねて表示し、ホバー (タッチでは選択) で円形に並べる。
+  エンジン対局と同じ画面での人対人に対応。表示言語は英語 (既定) と日本語を切り替えられる (`web/i18n.js`)
+- `src/chess.rs` は通常チェスのルール実装 (perft で検証済み)。座標などの共通処理を量子ルールから使っている
 
 ## 公開手順
 
 1. このディレクトリを GitHub リポジトリに push (`main` ブランチ)
 2. リポジトリの **Settings → Pages → Build and deployment → Source** を **GitHub Actions** に変更
 3. `main` に push するたびに `.github/workflows/pages.yml` が
-   テスト → WASM ビルド → Stockfish 取得 → Pages へデプロイ を行います
+   テスト → WASM ビルド → Pages へデプロイ を行います
 
 ## ローカルで動かす
 
 ```sh
-scripts/build.sh                # dist/ に組み立て (Rust, Node/npm が必要)
+scripts/build.sh                # dist/ に組み立て (Rust が必要)
 python3 -m http.server -d dist 8000
 # → http://localhost:8000
 ```
@@ -31,24 +48,19 @@ python3 -m http.server -d dist 8000
 ## 構成
 
 ```
-src/chess.rs     ルール本体 + perft テスト
-src/lib.rs       WASM 向け FFI (extern "C" + 入出力バッファ、wasm-bindgen 不要)
-web/rules.js     WASM のラッパー
-web/engine.js    Stockfish Worker の UCI ラッパー (探索の直列化・停止)
-web/app.js       盤面 UI (クリック / ドラッグ、成り選択、待った、PGN コピー)
-scripts/build.sh dist/ の組み立て
+src/quantum.rs       量子重ね合わせチェスのルール + テスト
+src/engine.rs        探索エンジン
+src/chess.rs         通常チェスのルール (共通処理) + perft テスト
+src/lib.rs           WASM 向け FFI (extern "C" + 入出力バッファ、wasm-bindgen 不要)
+web/rules.js         WASM のラッパー
+web/engine.js        エンジン Worker のラッパー (取り消しは Worker の作り直し)
+web/engine-worker.js 探索用 Worker
+web/i18n.js          画面の文言 (英語 / 日本語)
+web/app.js           盤面 UI (クリック / ドラッグ、手の解釈の選択、待った、棋譜コピー)
+scripts/build.sh     dist/ の組み立て (参照に版番号を付けてキャッシュ対策)
 ```
-
-## メモ
-
-- GitHub Pages は COOP/COEP ヘッダを付けられず `SharedArrayBuffer` が使えないため、
-  マルチスレッド版の Stockfish は動きません。`STOCKFISH_FLAVOR=single` にすると
-  大きいネットワークのシングルスレッド版 (約 100MB、GitHub Pages のファイル上限に注意) になります。
-- Stockfish のバージョンは `STOCKFISH_VERSION` (既定 19.0.1) で変えられます。
-  `UCI_Elo` は長めの持ち時間で較正された値なので、短い思考時間では表示より弱めになります。
 
 ## ライセンス
 
-Stockfish は GPLv3 です。これを同梱して配布するので、このプロジェクトも
-GPL-3.0-or-later としています (`Cargo.toml`)。リポジトリには GPLv3 の全文を `LICENSE` として置いてください。
-ビルド時に Stockfish.js のライセンス文を `engine/STOCKFISH-LICENSE.txt` として同梱します。
+`Cargo.toml` では GPL-3.0-or-later としています。以前は GPLv3 の Stockfish を同梱していたためですが、
+現在は同梱していないので、ライセンスは自由に選び直せます。

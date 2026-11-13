@@ -7,8 +7,10 @@
 //! - 文字列出力: 関数が `output_ptr()` に書き、戻り値で長さを返す
 
 pub mod chess;
+pub mod engine;
+pub mod quantum;
 
-use chess::{Game, Position, START_FEN};
+use quantum::Game;
 use std::cell::UnsafeCell;
 
 const BUF: usize = 4096;
@@ -59,30 +61,18 @@ pub extern "C" fn output_ptr() -> *const u8 {
     unsafe { (*G.output.get()).as_ptr() }
 }
 
-/// 初期局面から新しい対局を始める
+/// 初期局面 (全駒が重ね合わせ) から新しい対局を始める
 #[no_mangle]
 pub extern "C" fn new_game() {
-    unsafe { *G.game.get() = Some(Game::new(Position::start())) };
+    unsafe { *G.game.get() = Some(Game::default()) };
 }
 
-/// 入力バッファの FEN から対局を始める。成功で 1
-#[no_mangle]
-pub extern "C" fn load_fen(len: usize) -> i32 {
-    match Position::from_fen(input(len)) {
-        Some(p) => {
-            unsafe { *G.game.get() = Some(Game::new(p)) };
-            1
-        }
-        None => 0,
-    }
-}
-
-/// 入力バッファの UCI 手を指す。成功なら SAN を出力し長さを返す。不正手は 0
+/// 入力バッファの手 (e2e4 / e7e8q / e1g1c / e5d6e) を指す。成功なら表記を出力し長さを返す。不正手は 0
 #[no_mangle]
 pub extern "C" fn play(len: usize) -> usize {
     let mv = input(len).to_string();
-    match game().play_uci(&mv) {
-        Some(san) => output(&san),
+    match game().play(&mv) {
+        Some(note) => output(&note),
         None => 0,
     }
 }
@@ -93,63 +83,75 @@ pub extern "C" fn undo() -> i32 {
     game().undo() as i32
 }
 
-/// 合法手を空白区切りの UCI で出力
+/// 合法手を空白区切りで出力
 #[no_mangle]
 pub extern "C" fn legal_moves() -> usize {
-    let s: Vec<String> = game().pos().legal_moves().iter().map(|m| m.uci()).collect();
+    let s: Vec<String> = game().pos().legal_moves().iter().map(|m| m.code()).collect();
     output(&s.join(" "))
 }
 
-#[no_mangle]
-pub extern "C" fn fen() -> usize {
-    output(&game().pos().to_fen())
-}
-
-/// 対局開始局面の FEN (エンジンへの position コマンド用)
-#[no_mangle]
-pub extern "C" fn initial_fen() -> usize {
-    output(&game().initial.to_fen())
-}
-
-/// これまでの手を空白区切りの UCI で出力
+/// これまでの手を空白区切りで出力
 #[no_mangle]
 pub extern "C" fn move_history() -> usize {
-    let s: Vec<String> = game().moves.iter().map(|m| m.uci()).collect();
+    let s: Vec<String> = game().moves.iter().map(|m| m.code()).collect();
     output(&s.join(" "))
 }
 
-/// これまでの手を空白区切りの SAN で出力
+/// これまでの手の表記を空白区切りで出力
 #[no_mangle]
-pub extern "C" fn san_history() -> usize {
-    output(&game().sans.join(" "))
+pub extern "C" fn notation_history() -> usize {
+    let s: Vec<String> = game().notes.iter().map(|n| n.replace(' ', "_")).collect();
+    output(&s.join(" "))
 }
 
-/// 64 文字の盤面 (a1..h8、空きは '.')
+/// 64 マス (a1..h8) を空白区切り。"." = 空き、それ以外は色 (w/b) + ありうる種類 (pnbrqk)
 #[no_mangle]
 pub extern "C" fn board() -> usize {
-    output(&game().pos().board_string())
+    output(&game().pos().board_tokens())
+}
+
+/// 取られた駒を空白区切り (形式は board と同じ)
+#[no_mangle]
+pub extern "C" fn captured() -> usize {
+    output(&game().pos().captured_tokens())
+}
+
+/// 直前の手を重ね合わせの更新前の状態で見せるための情報 (Game::preview)。初手前は 0
+#[no_mangle]
+pub extern "C" fn preview() -> usize {
+    match game().preview() {
+        Some(s) => output(&s),
+        None => 0,
+    }
 }
 
 /// 0 = 白番, 1 = 黒番
 #[no_mangle]
 pub extern "C" fn side_to_move() -> i32 {
-    (game().pos().stm != 0) as i32
+    game().pos().stm as i32
 }
 
+/// 手番側の確定キングに王手がかかっているか
 #[no_mangle]
 pub extern "C" fn in_check() -> i32 {
     game().pos().in_check() as i32
 }
 
-/// 0 進行中 / 1 チェックメイト / 2 ステイルメイト / 3 50 手 / 4 千日手 / 5 駒不足
+/// 0 進行中 / 1 チェックメイト / 2 ステイルメイト / 3 50 手 / 4 千日手 / 5 駒不足 / 6 キング捕獲
+/// / 7 自分のキングの喪失が確定 (1 と 6 は手番側の負け、7 は直前に指した側の負け)
 #[no_mangle]
 pub extern "C" fn status() -> i32 {
     game().status() as i32
 }
 
+/// 現局面を ms ミリ秒探索し "手 評価値 深さ" を出力 (評価値は手番側から見た centipawn)。手がなければ 0
 #[no_mangle]
-pub extern "C" fn is_start_position() -> i32 {
-    (game().initial.to_fen() == START_FEN) as i32
+pub extern "C" fn search(ms: f64) -> usize {
+    let r = engine::search(game(), ms);
+    match r.best {
+        Some(m) => output(&format!("{} {} {}", m.code(), r.score, r.depth)),
+        None => 0,
+    }
 }
 
 #[cfg(test)]
@@ -169,15 +171,14 @@ mod tests {
     #[test]
     fn ffi_flow() {
         new_game();
-        assert_eq!(out(legal_moves()).split(' ').count(), 20);
-        assert_eq!(out(play(put("e2e4"))), "e4");
-        assert_eq!(play(put("e2e4")), 0);
+        assert_eq!(out(board()).split(' ').count(), 64);
+        assert!(out(board()).starts_with("wpnbrqk "));
+        assert_eq!(out(play(put("b1c3"))), "b1-c3(N)");
+        assert_eq!(play(put("b1c3")), 0);
         assert_eq!(side_to_move(), 1);
-        assert_eq!(out(move_history()), "e2e4");
+        assert_eq!(out(move_history()), "b1c3");
         assert_eq!(undo(), 1);
-        assert_eq!(out(fen()), START_FEN);
-        assert_eq!(load_fen(put("not a fen")), 0);
-        assert_eq!(load_fen(put("4k3/8/8/8/8/8/8/4K3 w - - 0 1")), 1);
-        assert_eq!(status(), 5);
+        assert_eq!(status(), 0);
+        assert!(out(search(50.0)).split(' ').count() == 3);
     }
 }

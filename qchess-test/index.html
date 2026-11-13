@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>量子重ね合わせチェス</title>
+  <link rel="stylesheet" href="style.css?v=a2f37a99bc">
+</head>
+<body>
+  <main class="layout">
+    <section class="board-wrap">
+      <div id="captured-top" class="captured"></div>
+      <div id="board" class="board" aria-label="チェス盤"></div>
+      <div id="captured-bottom" class="captured"></div>
+      <div id="status" class="status">読み込み中…</div>
+    </section>
+
+    <aside class="panel">
+      <h1>量子重ね合わせチェス</h1>
+
+      <fieldset>
+        <legend>新しい対局</legend>
+        <div class="row">
+          <label>相手
+            <select id="opponent">
+              <option value="engine">エンジン</option>
+              <option value="human">人（同じ画面で交互に指す）</option>
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <label id="color-box">手番
+            <select id="color">
+              <option value="w">白（先手）</option>
+              <option value="b">黒（後手）</option>
+              <option value="r">ランダム</option>
+            </select>
+          </label>
+          <button id="new-game" class="primary">対局開始</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>エンジン</legend>
+        <label class="inline">思考時間
+          <select id="movetime">
+            <option value="1000" selected>1 秒</option>
+            <option value="2000">2 秒</option>
+            <option value="3000">3 秒</option>
+            <option value="4000">4 秒</option>
+            <option value="5000">5 秒</option>
+          </select>
+        </label>
+        <p class="muted small">変更は次の手から反映されます。</p>
+      </fieldset>
+
+      <div class="row buttons">
+        <button id="undo">待った</button>
+        <button id="flip">盤を反転</button>
+        <button id="copy-pgn">棋譜をコピー</button>
+      </div>
+
+      <div id="eval" class="eval muted small"></div>
+      <ol id="moves" class="moves"></ol>
+
+      <details class="rules small">
+        <summary>ルール</summary>
+        <ul>
+          <li>初期配置の駒はすべて、ポーン・ナイト・ビショップ・ルーク・クイーン・キングの重ね合わせです。</li>
+          <li>駒は重ね合わせのどれか 1 種類として動きます。動いた後は、その動きと矛盾する種類が除外されます（例: ナイトの跳び方をしたらナイトに確定）。</li>
+          <li>各色の駒は通常の初期配置の駒数（ポーン 8・ナイト 2・ビショップ 2・ルーク 2・クイーン 1・キング 1）に割り当てられなければならず、ありえなくなった種類は動いていない駒や取られた駒からも除外されます。</li>
+          <li>チェックはキングに確定した駒にだけ適用されます。相手の盤上の駒のどれもキングでありえなくなったら（＝キングを取ったら）勝ちです。</li>
+          <li>キャスリング（指すとキングとルークに確定）、アンパッサン（取った駒・取られた駒ともポーンに確定）、成りがあります。</li>
+        </ul>
+        <p class="muted">駒にマウスを乗せると、ありうる種類を円形に並べて表示します。</p>
+      </details>
+
+      <p class="muted small footer">ルール判定・思考エンジン: Rust → WebAssembly</p>
+    </aside>
+  </main>
+
+  <dialog id="choice">
+    <p id="choice-title"></p>
+    <div id="choice-buttons" class="choice-buttons"></div>
+  </dialog>
+
+  <script type="module" src="app.js?v=a2f37a99bc"></script>
+</body>
+</html>
