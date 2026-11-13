@@ -2,6 +2,8 @@
 
 ブラウザだけで遊べる「量子重ね合わせチェス」です。ルール判定も思考エンジンも Rust → WebAssembly で動きます。
 
+https://volatilerye.github.io/quantum-superposition-chess/
+
 ## ルール (通常のチェスとの違い)
 
 - 初期配置の駒はすべて、ポーン・ナイト・ビショップ・ルーク・クイーン・キングの重ね合わせ
