@@ -62,5 +62,4 @@ scripts/build.sh     dist/ の組み立て (参照に版番号を付けてキャ
 
 ## ライセンス
 
-`Cargo.toml` では GPL-3.0-or-later としています。以前は GPLv3 の Stockfish を同梱していたためですが、
-現在は同梱していないので、ライセンスは自由に選び直せます。
+MIT License です (`LICENSE`)。
