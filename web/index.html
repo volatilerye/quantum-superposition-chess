@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rust × Stockfish チェス</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="layout">
+    <section class="board-wrap">
+      <div id="board" class="board" aria-label="チェス盤"></div>
+      <div id="status" class="status">読み込み中…</div>
+    </section>
+
+    <aside class="panel">
+      <h1>Rust × Stockfish チェス</h1>
+
+      <fieldset>
+        <legend>新しい対局</legend>
+        <div class="row">
+          <label>手番
+            <select id="color">
+              <option value="w">白（先手）</option>
+              <option value="b">黒（後手）</option>
+              <option value="r">ランダム</option>
+            </select>
+          </label>
+          <button id="new-game" class="primary">対局開始</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>相手の強さ</legend>
+        <div id="elo-box" class="slider-box">
+          <input id="elo" type="range" min="1320" max="3190" step="10" value="1500">
+          <div class="slider-label">Elo <b id="elo-val">1500</b></div>
+          <label class="inline">思考時間
+            <select id="movetime">
+              <option value="1000" selected>1 秒</option>
+              <option value="2000">2 秒</option>
+              <option value="3000">3 秒</option>
+              <option value="4000">4 秒</option>
+              <option value="5000">5 秒</option>
+            </select>
+          </label>
+        </div>
+        <p class="muted small">変更は次の手から反映されます。</p>
+      </fieldset>
+
+      <div class="row buttons">
+        <button id="undo">待った</button>
+        <button id="flip">盤を反転</button>
+        <button id="copy-pgn">PGN をコピー</button>
+      </div>
+
+      <div id="eval" class="eval muted small"></div>
+      <ol id="moves" class="moves"></ol>
+
+      <p class="muted small footer">
+        ルール判定: Rust → WebAssembly / 思考エンジン:
+        <a href="https://github.com/nmrugg/stockfish.js">Stockfish.js</a>（GPLv3）
+      </p>
+    </aside>
+  </main>
+
+  <dialog id="promo">
+    <p>成る駒を選んでください</p>
+    <div id="promo-choices" class="promo-choices"></div>
+  </dialog>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
