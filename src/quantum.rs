@@ -343,7 +343,8 @@ impl Position {
             if ks & P_ != 0 {
                 let dir: i8 = if us == WHITE { 1 } else { -1 };
                 let last = if us == WHITE { 7 } else { 0 };
-                let start = if us == WHITE { 1 } else { 6 };
+                // 2 マス前進は、まだ動いていない駒が 2 段目 (黒は 7 段目) か 1 段目 (黒は 8 段目) にいるとき
+                let (start, home) = if us == WHITE { (1, 0) } else { (6, 7) };
                 let promos = |to: u8, out: &mut Vec<Move>| {
                     for k in [QUEEN, ROOK, BISHOP, KNIGHT] {
                         out.push(Move { from, to, promo: k, special: Special::Normal, mask: P_ });
@@ -356,7 +357,7 @@ impl Position {
                         } else {
                             masks[to as usize] |= P_;
                         }
-                        if !p.moved && r == start {
+                        if !p.moved && (r == start || r == home) {
                             let to2 = at(f, r + 2 * dir).unwrap();
                             if self.board[to2 as usize] == 0 {
                                 masks[to2 as usize] |= P_;
@@ -880,6 +881,32 @@ mod tests {
         assert_eq!(kinds_at(&g, "d6"), "P");
         assert!(g.pos().piece_at(sq("d5")).is_none());
         assert!(g.pos().captured_tokens().contains("bp"));
+    }
+
+    #[test]
+    fn unmoved_pawn_on_first_rank_can_double_step() {
+        let mut p = custom(&[("e1", K_), ("b1", P_)], &[("h8", K_), ("c3", P_), ("g8", P_)]);
+        for s in ["b1", "g8"] {
+            let id = p.piece_at(sq(s)).unwrap();
+            p.pieces[id].moved = false;
+        }
+        let codes: Vec<String> = p.legal_moves().iter().filter(|m| m.from == sq("b1")).map(|m| m.code()).collect();
+        assert!(codes.contains(&"b1b2".to_string()) && codes.contains(&"b1b3".to_string()), "{codes:?}");
+        // 2 段目の駒が塞いでいると 2 マス前進もできない
+        let mut q = custom(&[("e1", K_), ("b1", P_), ("b2", P_)], &[("h8", K_)]);
+        let id = q.piece_at(sq("b1")).unwrap();
+        q.pieces[id].moved = false;
+        assert!(!q.legal_moves().iter().any(|m| m.from == sq("b1") && m.to == sq("b3")));
+
+        // 1 段目からの 2 マス前進もアンパッサンで取れる
+        let mut g = Game { history: vec![p], moves: vec![], notes: vec![] };
+        g.play("b1b3").unwrap();
+        g.play("c3b2e").unwrap();
+        assert!(g.pos().piece_at(sq("b3")).is_none());
+        // 一度動いた駒はもう 2 マス進めない。黒の 8 段目の未移動の駒は 2 マス進める
+        assert!(g.pos().legal_moves().iter().any(|m| m.code() == "e1d1"));
+        g.play("e1d1").unwrap();
+        assert!(g.play("g8g6").is_some());
     }
 
     #[test]
