@@ -66,26 +66,29 @@
         <button id="copy-pgn" data-i18n="copy">Copy game record</button>
       </div>
 
-      <div id="eval" class="eval muted small"></div>
       <ol id="moves" class="moves"></ol>
 
-      <details class="rules small">
-        <summary data-i18n="rules">Rules</summary>
-        <ul>
-          <li data-i18n="rule1"></li>
-          <li data-i18n="rule2"></li>
-          <li data-i18n="rule3"></li>
-          <li data-i18n="rule4"></li>
-          <li data-i18n="rule5"></li>
-          <li data-i18n="rule6"></li>
-          <li data-i18n="rule7"></li>
-        </ul>
-        <p class="muted" data-i18n="hoverNote"></p>
-      </details>
+      <section class="rules small">
+        <h2 data-i18n="rules">Rules</h2>
+        <div class="rules-box" tabindex="0">
+          <ul>
+            <li data-i18n="rule1"></li>
+            <li data-i18n="rule2"></li>
+            <li data-i18n="rule3"></li>
+            <li data-i18n="rule4"></li>
+            <li data-i18n="rule5"></li>
+            <li data-i18n="rule6"></li>
+            <li data-i18n="rule7"></li>
+          </ul>
+          <p class="muted" data-i18n="hoverNote"></p>
+        </div>
+      </section>
 
-      <p class="muted small footer"><span data-i18n="footer">Rules &amp; engine: Rust → WebAssembly</span><br>Thanks to Claude Code!</p>
+
     </aside>
   </main>
+
+  <div id="debug" class="debug" hidden></div>
 
   <dialog id="choice">
     <p id="choice-title"></p>

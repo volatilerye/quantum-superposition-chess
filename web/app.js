@@ -30,7 +30,8 @@ const state = {
   inspect: null, // 相手の駒や取られた駒をタップして見ているとき { sq } | { cap }、ply はその時点の手数
   thinking: false,
   token: 0, // 対局や待ったで増やし、古い探索結果を捨てる
-  evalText: "",
+  debug: false, // 隠しコマンドで評価・最善手を表示する
+  analyzer: null, // 評価・最善手用のエンジン (対局用とは別の Worker)
   animating: false, // 直前の手を段階的に見せている間は true (入力を受け付けない)
   error: null, // { key, vars } (言語を切り替えても訳し直せるようにキーで持つ)
 };
@@ -61,6 +62,7 @@ function updateSettingsUI() {
 function applyLang() {
   setLang($("lang").value || DEFAULT_LANG);
   applyStatic();
+  analysisKey = null;
   if (state.rules) render();
   saveSettings();
 }
@@ -168,7 +170,10 @@ function render(stage = null) {
   renderCaptured(stage);
   renderMoves(!!stage);
   if (stage) renderStaging();
-  else renderStatus();
+  else {
+    renderStatus();
+    analyze();
+  }
 }
 
 function coord(cls, text) {
@@ -187,8 +192,10 @@ function renderCaptured(stage = null) {
   for (const [id, color] of [["captured-bottom", top], ["captured-top", bottom]]) {
     const box = $(id);
     box.replaceChildren();
-    for (const [i, tok] of caps.entries()) {
-      if (tok[0] !== color) continue;
+    // ポーン > ナイト > ビショップ > ルーク > クイーン > キング > 不確定な駒 の順
+    const rank = (tok) => (tok.length === 2 ? "pnbrqk".indexOf(tok[1]) : 6);
+    const list = [...caps.entries()].filter(([, tok]) => tok[0] === color).sort((a, b) => rank(a[1]) - rank(b[1]));
+    for (const [i, tok] of list) {
       const c = document.createElement("span");
       c.className = "cap" + (changed.has(i) ? " collapsed" : "") + (inspecting("cap", i) ? " inspect" : "");
       c.dataset.i = i;
@@ -215,7 +222,6 @@ function renderMoves(staging = false) {
     ol.append(li);
   }
   ol.scrollTop = ol.scrollHeight;
-  $("eval").textContent = state.evalText;
 }
 
 
@@ -459,7 +465,6 @@ async function maybeEngineMove() {
   if (r && !rules.play(r.move)) {
     state.error = { key: "errIllegal", vars: { move: r.move } };
   } else if (r) {
-    state.evalText = formatEval(r, engineColor);
     await showLastMove();
     return;
   }
@@ -473,6 +478,50 @@ function cancelEngine() {
   state.thinking = false;
 }
 
+// ---- 隠しコマンド: 製作者名をタイプすると評価・最善手を左上に出す ----------------
+const SECRET = "volatile rye";
+let typed = "";
+let analysisKey = null;
+
+document.addEventListener("keydown", (ev) => {
+  if (ev.key.length !== 1 || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+  typed = (typed + ev.key.toLowerCase()).slice(-SECRET.length);
+  if (typed !== SECRET) return;
+  typed = "";
+  state.debug = !state.debug;
+  $("debug").hidden = !state.debug;
+  if (state.debug && !state.analyzer) state.analyzer = new Engine(WORKER_URL, WASM_URL);
+  if (!state.debug) state.analyzer?.cancel();
+  analysisKey = null;
+  analyze();
+});
+
+/** 今の局面を (対局用とは別のエンジンで) 探索し、評価と最善手を表示する */
+async function analyze() {
+  if (!state.debug || !state.analyzer || !state.rules) return;
+  const hist = state.rules.history();
+  const key = hist.join(" ") + "|" + state.rules.status();
+  if (key === analysisKey) return;
+  analysisKey = key;
+  const box = $("debug");
+  state.analyzer.cancel();
+  if (state.rules.status() !== "ongoing") {
+    box.textContent = "—";
+    return;
+  }
+  box.textContent = t("analyzing");
+  const color = state.rules.turn();
+  try {
+    const r = await state.analyzer.search(hist, Number($("movetime").value));
+    if (key !== analysisKey) return;
+    const m = r.move;
+    const move = `${m.slice(0, 2)}-${m.slice(2, 4)}` + ({ q: "=Q", r: "=R", b: "=B", n: "=N", c: " (O-O)", e: " e.p." }[m[4]] ?? "");
+    box.textContent = `${formatEval(r, color)}\n${t("bestMove", { move })}`;
+  } catch (e) {
+    if (key === analysisKey && e.message !== "cancelled") box.textContent = t("errEngine", { msg: e.message });
+  }
+}
+
 // ---- ボタン -------------------------------------------------------------
 function newGame() {
   cancelEngine();
@@ -482,7 +531,6 @@ function newGame() {
   state.flipped = state.opponent === "engine" && state.player === "b";
   state.selected = null;
   state.inspect = null;
-  state.evalText = "";
   state.error = null;
   state.rules.newGame();
   render();
@@ -504,7 +552,6 @@ function undo() {
   }
   state.selected = null;
   state.inspect = null;
-  state.evalText = "";
   state.error = null;
   render();
   maybeEngineMove(); // 後手で初手まで戻した場合はエンジンが指し直す
