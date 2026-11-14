@@ -26,10 +26,10 @@ body {
   flex-wrap: wrap;
   gap: 24px;
   justify-content: center;
-  padding: 20px;
+  padding: 20px 16px;
 }
 
-.board-wrap { width: min(92vw, 560px); }
+.board-wrap { width: min(calc(100vw - 32px), 560px); }
 
 .board {
   display: grid;
@@ -59,13 +59,14 @@ body {
 }
 .sq.light { background: var(--light); }
 .sq.dark { background: var(--dark); }
-.sq.last::before, .sq.sel::before {
+.sq.last::before, .sq.sel::before, .sq.inspect::before {
   content: "";
   position: absolute;
   inset: 0;
 }
 .sq.last::before { background: var(--last); }
 .sq.sel::before { background: var(--sel); }
+.sq.inspect::before { box-shadow: inset 0 0 0 3px var(--accent); }
 .sq.check { background-image: var(--check); }
 
 /* 重ね合わせの更新で種類が減った駒 */
@@ -121,7 +122,9 @@ body {
 .piece.super .g { opacity: calc(0.12 + 0.88 / var(--n)); }
 .sq:hover .piece.super .g,
 .sq.sel .piece.super .g,
-.cap:hover .piece.super .g {
+.sq.inspect .piece.super .g,
+.cap:hover .piece.super .g,
+.cap.inspect .piece.super .g {
   --a: calc(var(--i) / var(--n) * 1turn);
   opacity: 1;
   transform: translate(-50%, -50%) rotate(var(--a)) translateY(-0.36em) rotate(calc(-1 * var(--a))) scale(0.5);
@@ -164,14 +167,18 @@ body {
   font-size: 26px;
   line-height: 1;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.06);
+  /* 白い駒・黒い駒のどちらも見えるよう、盤の明るいマスに近い色にする */
+  background: #c9b79a;
+  cursor: pointer;
 }
+.cap.inspect { box-shadow: 0 0 0 2px var(--accent); }
 
 .status {
   margin-top: 12px;
   font-size: 1.05rem;
   min-height: 1.5em;
 }
+.status .active-desc { display: block; }
 .status.thinking::after {
   content: "…";
   animation: blink 1s infinite;
@@ -179,7 +186,7 @@ body {
 @keyframes blink { 50% { opacity: 0.2; } }
 
 .panel {
-  width: min(92vw, 340px);
+  width: min(calc(100vw - 32px), 340px);
   background: var(--panel);
   border-radius: 8px;
   padding: 16px 18px;

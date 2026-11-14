@@ -27,6 +27,7 @@ const state = {
   player: "w", // エンジン対局でのこちらの色
   flipped: false,
   selected: null,
+  inspect: null, // 相手の駒や取られた駒をタップして見ているとき { sq } | { cap }、ply はその時点の手数
   thinking: false,
   token: 0, // 対局や待ったで増やし、古い探索結果を捨てる
   evalText: "",
@@ -101,6 +102,25 @@ const describe = (token) => {
   return t("describe", { color: colorName(color), kinds: kinds.map(kindName).join(t("kindSep")) });
 };
 
+/** 今見ている駒 (選択中の自分の駒、またはタップした相手の駒・取られた駒) のトークン */
+function activeToken() {
+  const { rules } = state;
+  if (state.selected != null) return rules.board()[state.selected];
+  const ins = state.inspect;
+  if (!ins || ins.ply !== rules.history().length) return null;
+  const tok = ins.sq != null ? rules.board()[ins.sq] : rules.captured()[ins.cap];
+  return tok && tok !== "." ? tok : null;
+}
+
+const inspecting = (key, v) => state.inspect?.[key] === v && state.inspect.ply === state.rules.history().length;
+
+/** 相手の駒・取られた駒をタップしたら、その重ね合わせを状態欄に出す (もう一度タップで解除) */
+function inspectAt(key, v, occupied) {
+  state.selected = null;
+  state.inspect = occupied && !inspecting(key, v) ? { [key]: v, ply: state.rules.history().length } : null;
+  render();
+}
+
 /**
  * 盤面を描く。stage を渡すと直前の手を段階的に見せる途中の状態を描く:
  * - { kind: "move", pv }: 駒が動いた直後 (重ね合わせは指す前の種類のまま)
@@ -129,6 +149,7 @@ function render(stage = null) {
       el.dataset.sq = sq;
       if (lastSqs.includes(sq)) el.classList.add("last");
       if (sq === state.selected) el.classList.add("sel");
+      if (inspecting("sq", sq)) el.classList.add("inspect");
       if (sq === checkSq) el.classList.add("check");
       if (targets.includes(sq)) el.classList.add("target");
       if (changed.has(sq)) el.classList.add("collapsed");
@@ -169,7 +190,8 @@ function renderCaptured(stage = null) {
     for (const [i, tok] of caps.entries()) {
       if (tok[0] !== color) continue;
       const c = document.createElement("span");
-      c.className = "cap" + (changed.has(i) ? " collapsed" : "");
+      c.className = "cap" + (changed.has(i) ? " collapsed" : "") + (inspecting("cap", i) ? " inspect" : "");
+      c.dataset.i = i;
       c.title = t("captured", { desc: describe(tok) });
       c.append(pieceEl(tok));
       box.append(c);
@@ -245,6 +267,9 @@ function renderStatus() {
   const st = rules.status();
   const turn = rules.turn();
   statusEl.classList.remove("thinking");
+  const tok = activeToken();
+  const isCap = state.selected == null && state.inspect?.cap != null;
+  const desc = tok ? (isCap ? t("captured", { desc: describe(tok) }) : describe(tok)) : "";
   if (state.error) {
     statusEl.textContent = t(state.error.key, state.error.vars);
   } else if (winnerOf(st, turn)) {
@@ -259,6 +284,13 @@ function renderStatus() {
   } else {
     const key = state.opponent === "engine" ? "toMoveYou" : "toMove";
     statusEl.textContent = t(key, { color: colorName(turn) }) + (rules.inCheck() ? t("check") : "");
+  }
+  if (desc && !state.error) {
+    // 見ている駒の重ね合わせを太字で 1 行目に出す
+    const b = document.createElement("strong");
+    b.className = "active-desc";
+    b.textContent = desc;
+    statusEl.prepend(b);
   }
   $("undo").disabled = rules.history().length === 0;
 }
@@ -330,20 +362,20 @@ let drag = null;
 
 boardEl.addEventListener("pointerdown", (ev) => {
   const el = ev.target.closest(".sq");
-  if (!el || !canMove()) return;
+  if (!el) return;
   const sq = Number(el.dataset.sq);
+  const occupied = state.rules.board()[sq] !== ".";
+  if (!canMove()) return inspectAt("sq", sq, occupied);
 
   if (state.selected != null && state.selected !== sq && !ownPiece(sq)) {
     tryMove(state.selected, sq).then((ok) => {
-      if (!ok) {
-        state.selected = null;
-        render();
-      }
+      if (!ok) inspectAt("sq", sq, occupied);
     });
     return;
   }
-  if (!ownPiece(sq)) return;
+  if (!ownPiece(sq)) return inspectAt("sq", sq, occupied);
 
+  state.inspect = null;
   state.selected = sq;
   render();
   const piece = boardEl.querySelector(`[data-sq="${sq}"] .piece`);
@@ -383,6 +415,12 @@ function endDrag(ev) {
   }
 }
 boardEl.addEventListener("pointerup", endDrag);
+for (const id of ["captured-top", "captured-bottom"]) {
+  $(id).addEventListener("click", (ev) => {
+    const c = ev.target.closest(".cap");
+    if (c) inspectAt("cap", Number(c.dataset.i), true);
+  });
+}
 boardEl.addEventListener("pointercancel", endDrag);
 
 // ---- エンジン -----------------------------------------------------------
@@ -443,6 +481,7 @@ function newGame() {
   state.player = c === "r" ? (Math.random() < 0.5 ? "w" : "b") : c;
   state.flipped = state.opponent === "engine" && state.player === "b";
   state.selected = null;
+  state.inspect = null;
   state.evalText = "";
   state.error = null;
   state.rules.newGame();
@@ -464,6 +503,7 @@ function undo() {
     } while (rules.turn() !== state.player && rules.history().length > 0);
   }
   state.selected = null;
+  state.inspect = null;
   state.evalText = "";
   state.error = null;
   render();
