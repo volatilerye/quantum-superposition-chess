@@ -43,9 +43,12 @@ const SETTINGS = ["lang", "opponent", "color", "level"];
  * 強さレベル n (1〜10): 「思考 n 秒以内」か「深さ n 手以内」の先に達した方で止める。
  * レベル 11 は思考 10 秒以内で、深さの制限なし
  */
+/** 隠しコマンドの解析は、レベル 11 と同じく思考 10 秒以内・深さの制限なし */
+const ANALYSIS_LIMITS = [10000, 64];
+
 const levelLimits = () => {
   const n = Number($("level").value);
-  return n >= 11 ? [10000, 64] : [n * 1000, n];
+  return n >= 11 ? ANALYSIS_LIMITS : [n * 1000, n];
 };
 
 function loadSettings() {
@@ -545,7 +548,7 @@ async function analyze() {
   box.textContent = t("analyzing");
   const color = state.rules.turn();
   try {
-    const r = await state.analyzer.search(hist, ...levelLimits());
+    const r = await state.analyzer.search(hist, ...ANALYSIS_LIMITS);
     if (key !== analysisKey) return;
     const m = r.move;
     const move = `${m.slice(0, 2)}-${m.slice(2, 4)}` + ({ q: "=Q", r: "=R", b: "=B", n: "=N", c: " (O-O)", e: " e.p." }[m[4]] ?? "");
