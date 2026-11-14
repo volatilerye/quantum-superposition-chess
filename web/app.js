@@ -37,7 +37,13 @@ const state = {
 };
 
 // ---- 設定の保存 ---------------------------------------------------------
-const SETTINGS = ["lang", "opponent", "color", "movetime"];
+const SETTINGS = ["lang", "opponent", "color", "level"];
+
+/** 強さレベル n: 「思考 n 秒以内」か「深さ n 手以内」の先に達した方で止める */
+const levelLimits = () => {
+  const n = Number($("level").value);
+  return [n * 1000, n];
+};
 
 function loadSettings() {
   try {
@@ -449,7 +455,7 @@ async function maybeEngineMove() {
   const started = performance.now();
   let r;
   try {
-    r = await engine.search(rules.history(), Number($("movetime").value));
+    r = await engine.search(rules.history(), ...levelLimits());
   } catch (e) {
     if (token !== state.token) return; // 取り消し
     state.thinking = false;
@@ -512,7 +518,7 @@ async function analyze() {
   box.textContent = t("analyzing");
   const color = state.rules.turn();
   try {
-    const r = await state.analyzer.search(hist, Number($("movetime").value));
+    const r = await state.analyzer.search(hist, ...levelLimits());
     if (key !== analysisKey) return;
     const m = r.move;
     const move = `${m.slice(0, 2)}-${m.slice(2, 4)}` + ({ q: "=Q", r: "=R", b: "=B", n: "=N", c: " (O-O)", e: " e.p." }[m[4]] ?? "");

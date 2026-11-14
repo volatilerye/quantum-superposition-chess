@@ -144,10 +144,11 @@ pub extern "C" fn status() -> i32 {
     game().status() as i32
 }
 
-/// 現局面を ms ミリ秒探索し "手 評価値 深さ" を出力 (評価値は手番側から見た centipawn)。手がなければ 0
+/// 現局面を ms ミリ秒まで、または深さ depth 手まで探索し "手 評価値 深さ" を出力
+/// (評価値は手番側から見た centipawn)。手がなければ 0
 #[no_mangle]
-pub extern "C" fn search(ms: f64) -> usize {
-    let r = engine::search(game(), ms);
+pub extern "C" fn search(ms: f64, depth: u32) -> usize {
+    let r = engine::search(game(), ms, depth);
     match r.best {
         Some(m) => output(&format!("{} {} {}", m.code(), r.score, r.depth)),
         None => 0,
@@ -179,6 +180,6 @@ mod tests {
         assert_eq!(out(move_history()), "b1c3");
         assert_eq!(undo(), 1);
         assert_eq!(status(), 0);
-        assert!(out(search(50.0)).split(' ').count() == 3);
+        assert!(out(search(50.0, 64)).split(' ').count() == 3);
     }
 }

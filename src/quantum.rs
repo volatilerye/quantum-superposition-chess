@@ -29,6 +29,23 @@ pub const ALL: u8 = 0b11_1111;
 
 /// 各色の初期配置の駒数 (P N B R Q K)
 const INITIAL_COUNT: [u8; 6] = [8, 2, 2, 2, 1, 1];
+
+/// 種類の集合 S (6 ビット) に割り当てられる駒の数 (S に含まれる種類の初期枚数の和)
+const CAPACITY: [u8; 64] = {
+    let mut t = [0u8; 64];
+    let mut s = 0;
+    while s < 64 {
+        let mut b = 0;
+        while b < 6 {
+            if s & (1 << b) != 0 {
+                t[s] += INITIAL_COUNT[b];
+            }
+            b += 1;
+        }
+        s += 1;
+    }
+    t
+};
 const LETTERS: [u8; 6] = *b"PNBRQK";
 
 /// 盤外 (取られた駒) を表すマス
@@ -225,7 +242,7 @@ impl Position {
     }
 
     fn capacity(s: usize) -> u8 {
-        (0..6).filter(|b| s & (1 << b) != 0).map(|b| INITIAL_COUNT[b]).sum()
+        CAPACITY[s]
     }
 
     /// 駒数制約を満たす割り当てが存在するか (Hall の条件)
@@ -327,6 +344,11 @@ impl Position {
     // ---- 指し手生成 -----------------------------------------------------------
 
     fn pseudo_moves(&self, out: &mut Vec<Move>) {
+        self.gen_moves(out, false);
+    }
+
+    /// 指し手生成。`captures_only` なら駒取り・アンパッサン・成りだけ (静止探索用)
+    fn gen_moves(&self, out: &mut Vec<Move>, captures_only: bool) {
         let us = self.stm;
         let them = us ^ 1;
         let enemy = |s: u8| self.piece_at(s).map(|i| self.pieces[i].color == them).unwrap_or(false);
@@ -339,6 +361,7 @@ impl Position {
             let (f, r) = (file(from), rank(from));
             let ks = p.kinds();
             let mut masks = [0u8; 64];
+            let mut touched = 0u64; // masks が 0 でないマス
 
             if ks & P_ != 0 {
                 let dir: i8 = if us == WHITE { 1 } else { -1 };
@@ -354,13 +377,15 @@ impl Position {
                     if self.board[to as usize] == 0 {
                         if rank(to) == last {
                             promos(to, out);
-                        } else {
+                        } else if !captures_only {
                             masks[to as usize] |= P_;
+                            touched |= 1 << to;
                         }
-                        if !p.moved && (r == start || r == home) {
+                        if !captures_only && !p.moved && (r == start || r == home) {
                             let to2 = at(f, r + 2 * dir).unwrap();
                             if self.board[to2 as usize] == 0 {
                                 masks[to2 as usize] |= P_;
+                                touched |= 1 << to2;
                             }
                         }
                     }
@@ -372,6 +397,7 @@ impl Position {
                                 promos(to, out);
                             } else {
                                 masks[to as usize] |= P_;
+                                touched |= 1 << to;
                             }
                         } else if matches!(self.ep, Some((s, _)) if s == to) {
                             out.push(Move { from, to, promo: 0, special: Special::EnPassant, mask: P_ });
@@ -385,8 +411,9 @@ impl Position {
                 }
                 for &(df, dr) in ds {
                     if let Some(to) = at(f + df, r + dr) {
-                        if self.board[to as usize] == 0 || enemy(to) {
+                        if (!captures_only && self.board[to as usize] == 0) || enemy(to) {
                             masks[to as usize] |= kb;
+                            touched |= 1 << to;
                         }
                     }
                 }
@@ -400,10 +427,14 @@ impl Position {
                     let (mut cf, mut cr) = (f + df, r + dr);
                     while let Some(to) = at(cf, cr) {
                         if self.board[to as usize] == 0 {
-                            masks[to as usize] |= m;
+                            if !captures_only {
+                                masks[to as usize] |= m;
+                                touched |= 1 << to;
+                            }
                         } else {
                             if enemy(to) {
                                 masks[to as usize] |= m;
+                                touched |= 1 << to;
                             }
                             break;
                         }
@@ -412,10 +443,13 @@ impl Position {
                     }
                 }
             }
-            for to in 0..64u8 {
-                if masks[to as usize] != 0 {
-                    out.push(Move { from, to, promo: 0, special: Special::Normal, mask: masks[to as usize] });
-                }
+            while touched != 0 {
+                let to = touched.trailing_zeros() as u8;
+                touched &= touched - 1;
+                out.push(Move { from, to, promo: 0, special: Special::Normal, mask: masks[to as usize] });
+            }
+            if captures_only {
+                continue;
             }
 
             // キャスリング: 未移動のキング候補 (e1/e8) と未移動のルーク候補
@@ -530,26 +564,60 @@ impl Position {
 
     /// `keep` を満たす手だけの合法手と指した後の局面
     pub fn legal_children_where(&self, keep: impl Fn(&Move) -> bool) -> Vec<(Move, Position)> {
-        let mut pseudo = Vec::with_capacity(96);
-        self.pseudo_moves(&mut pseudo);
-        let us = self.stm;
-        pseudo
+        self.pseudo_legal()
             .into_iter()
             .filter(|m| keep(m))
-            .filter_map(|m| {
-                let n = self.apply(m);
-                if m.special == Special::Castle && !n.feasible(us) {
-                    return None;
-                }
-                // 確定したキングを利きに残す手は不可
-                if let Some(k) = n.definite_king(us) {
-                    if n.attacked(k, us ^ 1) {
-                        return None;
-                    }
-                }
-                Some((m, n))
-            })
+            .filter_map(|m| self.play_legal(m).map(|n| (m, n)))
             .collect()
+    }
+
+    /// 合法性を確かめる前の駒取り・アンパッサン・成り (静止探索用)
+    pub fn pseudo_captures(&self) -> Vec<Move> {
+        let mut out = Vec::with_capacity(32);
+        self.gen_moves(&mut out, true);
+        out
+    }
+
+    /// 合法性を確かめる前の手 (エンジンが手を並べ替えてから 1 手ずつ指すため)
+    pub fn pseudo_legal(&self) -> Vec<Move> {
+        let mut out = Vec::with_capacity(96);
+        self.pseudo_moves(&mut out);
+        out
+    }
+
+    /// pseudo-legal な手 `m` を指す。反則なら None
+    pub fn play_legal(&self, m: Move) -> Option<Position> {
+        let us = self.stm;
+        let n = self.apply(m);
+        if m.special == Special::Castle && !n.feasible(us) {
+            return None;
+        }
+        // 確定したキングを利きに残す手は不可
+        if let Some(k) = n.definite_king(us) {
+            if n.attacked(k, us ^ 1) {
+                return None;
+            }
+        }
+        Some(n)
+    }
+
+    /// 置換表用のハッシュ (駒の位置・ありうる種類・成り・未移動、手番、アンパッサン)
+    pub fn hash(&self) -> u64 {
+        fn mix(mut z: u64) -> u64 {
+            z = z.wrapping_add(0x9E37_79B9_7F4A_7C15);
+            z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+            z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+            z ^ (z >> 31)
+        }
+        let mut h = mix(self.stm as u64 + 1);
+        for (i, p) in self.pieces.iter().enumerate() {
+            let v = p.sq as u64 | (p.domain as u64) << 8 | (p.promoted as u64) << 16 | (p.moved as u64) << 24;
+            h ^= mix((i as u64) << 32 | v);
+        }
+        if let Some((s, _)) = self.ep {
+            h ^= mix(0xEE00 | s as u64);
+        }
+        h
     }
 
     pub fn legal_moves(&self) -> Vec<Move> {
