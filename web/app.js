@@ -38,7 +38,7 @@ const state = {
 };
 
 // ---- 設定の保存 ---------------------------------------------------------
-const SETTINGS = ["lang", "opponent", "color", "level", "guard"];
+const SETTINGS = ["lang", "opponent", "color", "level", "guard", "overlay"];
 
 /**
  * 強さレベル n (1〜10): 「思考 n 秒以内」か「深さ n 手以内」の先に達した方で止める。
@@ -738,6 +738,9 @@ $("copy-pgn").onclick = async () => {
   }
 };
 for (const id of SETTINGS) $(id).addEventListener("input", id === "lang" ? applyLang : updateSettingsUI);
+// OFF (初期値) のときは、ホバー・右クリック時と同じく常に種類を円形に並べる
+const applyOverlay = () => document.body.classList.toggle("overlay", $("overlay").checked);
+$("overlay").addEventListener("change", applyOverlay);
 $("guard").addEventListener("change", () => {
   playableCache.key = null;
   if (state.rules) render();
@@ -746,6 +749,7 @@ $("guard").addEventListener("change", () => {
 // ---- 起動 ---------------------------------------------------------------
 async function main() {
   loadSettings();
+  applyOverlay();
   applyLang();
   updateSettingsUI();
   try {

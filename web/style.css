@@ -125,7 +125,8 @@ body {
 .sq.inspect .piece.super .g,
 .cap:hover .piece.super .g,
 .cap.inspect .piece.super .g,
-body.peek .piece.super .g {
+body.peek .piece.super .g,
+body:not(.overlay) .piece.super .g {
   --a: calc(var(--i) / var(--n) * 1turn);
   opacity: 1;
   transform: translate(-50%, -50%) rotate(var(--a)) translateY(-0.36em) rotate(calc(-1 * var(--a))) scale(0.5);
@@ -207,7 +208,7 @@ fieldset {
 legend { color: var(--muted); font-size: 0.85rem; padding: 0 4px; }
 
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.check { display: flex; gap: 6px; align-items: flex-start; margin: -2px 0 10px; color: var(--muted); cursor: pointer; }
+.check { display: flex; gap: 6px; align-items: flex-start; margin: -4px 0 8px; color: var(--muted); cursor: pointer; }
 .check input { margin: 2px 0 0; }
 .row.buttons { margin-bottom: 10px; flex-wrap: nowrap; gap: 6px; }
 .row.buttons button { font-size: 0.85rem; padding: 5px 8px; white-space: nowrap; }
@@ -253,7 +254,7 @@ fieldset p { margin: 4px 0 0; }
 .rules { margin-top: 12px; }
 .rules h2 { font-size: 0.85rem; font-weight: 600; color: var(--muted); margin: 0 0 4px; }
 .rules-box {
-  max-height: 130px;
+  max-height: 110px;
   overflow-y: auto;
   padding: 6px 10px;
   background: #23262a;

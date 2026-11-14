@@ -25,6 +25,7 @@ const en = {
   flip: "Flip board",
   copy: "Copy game record",
   guard: "Block moves that leave none of your pieces on the board able to be the king",
+  overlay: "Show possible kinds stacked on top of each other",
   copied: "Copied",
   recordPrompt: "Game record",
 
@@ -42,7 +43,8 @@ const en = {
     "Castling: possible with an unmoved king candidate on e1 (e8 for Black) and an unmoved rook candidate on a1 or h1 (a8 or h8). The squares between them must be empty, and the king's square, the square it passes and its destination must not be attacked (a superposed enemy piece attacks a square if any of its possible kinds does). The two pieces collapse to a king and a rook. When the move can't be told apart from a rook or queen moving sideways (e.g. e1→g1), you choose which one you mean.",
   rule7:
     "A piece that has never moved may advance two squares as a pawn from its first rank as well as its second (e.g. b1→b3 for White, b8→b6 for Black). It can be captured en passant as usual.",
-  hoverNote: "Hover over a piece to see its possible kinds arranged in a circle.",
+  hoverNote:
+    "With “Show possible kinds stacked” on, hover over a piece to see its possible kinds arranged in a circle, or hold the right mouse button to see every piece that way.",
 
   white: "White",
   black: "Black",
@@ -118,6 +120,7 @@ const ja = {
   flip: "盤を反転",
   copy: "棋譜をコピー",
   guard: "自分の盤上の駒がどれもキングでありえなくなる手を指せなくする",
+  overlay: "駒のありうる種類を半透明で重ねて表示する",
   copied: "コピーしました",
   recordPrompt: "棋譜",
 
@@ -132,7 +135,7 @@ const ja = {
   rule6:
     "キャスリング: e1（黒は e8）にいる一度も動いていないキング候補の駒と、a1・h1（黒は a8・h8）にいる一度も動いていないルーク候補の駒で指せます。間のマスが空いていて、キングのいるマス・通過するマス・行き先のマスのどれも相手の駒に利かされていないことが条件です（相手の駒が重ね合わせのときは、ありうる種類のどれか 1 つでも利いていれば利かされているとみなします）。指すと、動いた 2 枚はそれぞれキングとルークに確定します。e1→g1 のようにルーク・クイーンとしての横移動と区別できない場合は、どちらとして指すかを選べます。",
   rule7: "一度も動いていない駒は、2 段目だけでなく 1 段目からもポーンとして 2 マス前進できます（白なら b1→b3、黒なら b8→b6 など）。通常どおりアンパッサンで取られることがあります。",
-  hoverNote: "駒にマウスを乗せると、ありうる種類を円形に並べて表示します。",
+  hoverNote: "「半透明で重ねて表示」を ON にしているときは、駒にマウスを乗せると、ありうる種類を円形に並べて表示します。右クリックを押している間は、全部の駒をそう表示します。",
 
   white: "白",
   black: "黒",
