@@ -39,10 +39,13 @@ const state = {
 // ---- 設定の保存 ---------------------------------------------------------
 const SETTINGS = ["lang", "opponent", "color", "level"];
 
-/** 強さレベル n: 「思考 n 秒以内」か「深さ n 手以内」の先に達した方で止める */
+/**
+ * 強さレベル n (1〜10): 「思考 n 秒以内」か「深さ n 手以内」の先に達した方で止める。
+ * レベル 11 は思考 10 秒以内で、深さの制限なし
+ */
 const levelLimits = () => {
   const n = Number($("level").value);
-  return [n * 1000, n];
+  return n >= 11 ? [10000, 64] : [n * 1000, n];
 };
 
 function loadSettings() {
