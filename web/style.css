@@ -246,7 +246,7 @@ fieldset p { margin: 4px 0 0; }
 .rules { margin-top: 12px; }
 .rules h2 { font-size: 0.85rem; font-weight: 600; color: var(--muted); margin: 0 0 4px; }
 .rules-box {
-  max-height: 120px;
+  max-height: 170px;
   overflow-y: auto;
   padding: 6px 10px;
   background: #23262a;
@@ -268,10 +268,10 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
 .choice-buttons .glyph { font-size: 28px; line-height: 1; }
 
 
-/* 隠しコマンドで出す評価・最善手 */
+/* 隠しコマンドで出す評価・最善手 (左下) */
 .debug {
   position: fixed;
-  top: 8px;
+  bottom: 8px;
   left: 8px;
   z-index: 50;
   padding: 6px 10px;
