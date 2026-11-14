@@ -339,10 +339,34 @@ async function tryMove(from, to) {
     code = await askChoice(t("whichMove"), cands.map((c) => ({ value: c, ...choiceLabel(c, cands) })));
     if (!code) return false;
   }
+  if (!(await confirmLostPawn(from, to, code))) return false;
   state.selected = null;
   if (!state.rules.play(code)) return false;
   if (await showLastMove()) maybeEngineMove();
   return true;
+}
+
+/**
+ * ポーンでありうる駒を 2 マス前に動かすのに、ポーンとしては 2 マス進めない (既に動かしたことがある) とき、
+ * ルーク・クイーンなどとしての移動になってポーンの可能性が消えるので、確認してから指す
+ */
+async function confirmLostPawn(from, to, code) {
+  const { rules } = state;
+  const tok = rules.board()[from];
+  const dir = tok[0] === "w" ? 1 : -1;
+  if (!tok.slice(1).includes("p") || to - from !== 16 * dir) return true;
+  // 確認するのは 2 段目 (黒は 7 段目) からの手だけ (ほかの段からはポーンとして 2 マス進めないのが見れば分かる)
+  if (Math.floor(from / 8) !== (dir === 1 ? 1 : 6)) return true;
+  // 試しに指して、ポーンの可能性が残るかを見る
+  if (!rules.play(code)) return true;
+  const keepsPawn = rules.board()[to].slice(1).includes("p");
+  rules.undo();
+  if (keepsPawn) return true;
+  const ok = await askChoice(t("lostPawnTitle"), [
+    { value: "yes", text: t("lostPawnYes") },
+    { value: "no", text: t("lostPawnNo") },
+  ]);
+  return ok === "yes";
 }
 
 function askChoice(title, options) {

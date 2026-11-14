@@ -73,6 +73,10 @@ const en = {
   check: " — Check!",
 
   whichMove: "Which move do you mean?",
+  lostPawnTitle:
+    "This piece has already moved, so it can't advance two squares as a pawn!\nIf you move it, it will no longer be able to be a pawn. Move it anyway?",
+  lostPawnYes: "Move it",
+  lostPawnNo: "Cancel",
   promoteTo: "Promote to {kind}",
   castle: "Castle",
   enPassant: "En passant (capture as a pawn)",
@@ -158,6 +162,9 @@ const ja = {
   check: " — チェック！",
 
   whichMove: "どの動きにしますか？",
+  lostPawnTitle: "既に動かしたことのある駒なので、ポーンとしては 2 マス進めません！\n動かすとポーンの可能性がなくなりますが、動かしますか？",
+  lostPawnYes: "動かす",
+  lostPawnNo: "やめる",
   promoteTo: "{kind}に成る",
   castle: "キャスリング",
   enPassant: "アンパッサン（ポーンとして取る）",
