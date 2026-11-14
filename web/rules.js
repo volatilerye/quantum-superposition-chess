@@ -48,12 +48,12 @@ export async function loadRules(url) {
     inCheck: () => e.in_check() === 1,
     /** "checkmate" と "kingCaptured" は手番側の負け、"kingRevealed" は直前に指した側の負け */
     status: () => STATUS[e.status()] ?? "ongoing",
-    /** 現局面を ms ミリ秒探索。{ move, score (手番側から見た centipawn), depth } か null */
-    search: (ms) => {
-      const s = get(e.search(ms));
+    /** 現局面を ms ミリ秒まで、または深さ depth 手まで探索。{ move, score (手番側から見た centipawn), depth } か null */
+    search: (ms, depth = 64) => {
+      const s = get(e.search(ms, depth));
       if (!s) return null;
-      const [move, score, depth] = s.split(" ");
-      return { move, score: Number(score), depth: Number(depth) };
+      const [move, score, reached] = s.split(" ");
+      return { move, score: Number(score), depth: Number(reached) };
     },
   };
 }

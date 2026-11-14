@@ -15,7 +15,7 @@ self.onmessage = async (ev) => {
       for (const m of ev.data.moves) {
         if (!rules.play(m)) throw new Error(`failed to replay move: ${m}`);
       }
-      self.postMessage({ id, ok: true, result: rules.search(ev.data.ms) });
+      self.postMessage({ id, ok: true, result: rules.search(ev.data.ms, ev.data.depth) });
     }
   } catch (e) {
     self.postMessage({ id, ok: false, error: String(e?.message ?? e) });

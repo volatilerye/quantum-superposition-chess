@@ -200,6 +200,7 @@ fieldset {
   border-radius: 6px;
   margin: 0 0 10px;
   padding: 6px 12px 8px;
+  min-width: 0; /* 中身が長くてもパネルからはみ出さない */
 }
 legend { color: var(--muted); font-size: 0.85rem; padding: 0 4px; }
 
@@ -209,7 +210,9 @@ legend { color: var(--muted); font-size: 0.85rem; padding: 0 4px; }
 .slider-box { margin: 2px 0 6px; }
 .slider-box input[type="range"] { width: 100%; }
 .slider-label { font-size: 0.9rem; }
-.inline { display: inline-flex; gap: 6px; align-items: center; font-size: 0.9rem; margin-top: 4px; }
+.inline { display: flex; gap: 6px; align-items: center; font-size: 0.9rem; margin-top: 4px; }
+.inline > span { white-space: nowrap; }
+.inline select { min-width: 0; max-width: 100%; }
 
 button, select {
   font: inherit;

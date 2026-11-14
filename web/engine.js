@@ -42,10 +42,10 @@ export class Engine {
     return this.ready;
   }
 
-  /** 棋譜 (手のコードの配列) の局面を ms ミリ秒探索する */
-  async search(moves, ms) {
+  /** 棋譜 (手のコードの配列) の局面を ms ミリ秒まで、または深さ depth 手まで探索する */
+  async search(moves, ms, depth = 64) {
     await this.ready;
-    return this.#call({ type: "search", moves, ms });
+    return this.#call({ type: "search", moves, ms, depth });
   }
 
   /** 探索中なら打ち切る */
