@@ -28,6 +28,7 @@ const state = {
   flipped: false,
   selected: null,
   inspect: null, // 相手の駒や取られた駒をタップして見ているとき { sq } | { cap }、ply はその時点の手数
+  hover: null, // マウスを乗せている (またはドラッグ中の指の下の) 駒 { sq } | { cap }
   thinking: false,
   token: 0, // 対局や待ったで増やし、古い探索結果を捨てる
   debug: false, // 隠しコマンドで評価・最善手を表示する
@@ -37,7 +38,7 @@ const state = {
 };
 
 // ---- 設定の保存 ---------------------------------------------------------
-const SETTINGS = ["lang", "opponent", "color", "level"];
+const SETTINGS = ["lang", "opponent", "color", "level", "guard"];
 
 /**
  * 強さレベル n (1〜10): 「思考 n 秒以内」か「深さ n 手以内」の先に達した方で止める。
@@ -55,13 +56,14 @@ function loadSettings() {
   try {
     const s = JSON.parse(localStorage.getItem("qchess-settings") || "{}");
     for (const id of SETTINGS) {
-      if (s[id] && $(id).querySelector(`option[value="${s[id]}"]`)) $(id).value = s[id];
+      if ($(id).type === "checkbox") $(id).checked = s[id] === true;
+      else if (s[id] && $(id).querySelector(`option[value="${s[id]}"]`)) $(id).value = s[id];
     }
   } catch {}
 }
 function saveSettings() {
   try {
-    localStorage.setItem("qchess-settings", JSON.stringify(Object.fromEntries(SETTINGS.map((id) => [id, $(id).value]))));
+    localStorage.setItem("qchess-settings", JSON.stringify(Object.fromEntries(SETTINGS.map((id) => [id, $(id).type === "checkbox" ? $(id).checked : $(id).value]))));
   } catch {}
 }
 
@@ -89,9 +91,30 @@ function displayToSq(row, col) {
   return state.flipped ? row * 8 + (7 - col) : (7 - row) * 8 + col;
 }
 
+/**
+ * こちらが指せる手。オプションが ON なら、自分の盤上の駒がどれもキングでありえなくなる
+ * (指した瞬間に負けになる) 手を除く。全部の手がそうなら、何も指せなくならないよう全部残す
+ */
+let playableCache = { key: null, moves: [] };
+function playableMoves() {
+  const { rules } = state;
+  const all = rules.legalMoves();
+  if (!$("guard").checked) return all;
+  const key = rules.history().join(" ");
+  if (playableCache.key === key) return playableCache.moves;
+  const safe = all.filter((code) => {
+    if (!rules.play(code)) return true;
+    const lost = rules.status() === "kingRevealed";
+    rules.undo();
+    return !lost;
+  });
+  playableCache = { key, moves: safe.length ? safe : all };
+  return playableCache.moves;
+}
+
 function legalTargets(from) {
   const name = sqName(from);
-  return [...new Set(state.rules.legalMoves().filter((m) => m.startsWith(name)).map((m) => sqIndex(m.slice(2, 4))))];
+  return [...new Set(playableMoves().filter((m) => m.startsWith(name)).map((m) => sqIndex(m.slice(2, 4))))];
 }
 
 // ---- 描画 ---------------------------------------------------------------
@@ -116,14 +139,41 @@ const describe = (token) => {
   return t("describe", { color: colorName(color), kinds: kinds.map(kindName).join(t("kindSep")) });
 };
 
-/** 今見ている駒 (選択中の自分の駒、またはタップした相手の駒・取られた駒) のトークン */
-function activeToken() {
-  const { rules } = state;
-  if (state.selected != null) return rules.board()[state.selected];
-  const ins = state.inspect;
-  if (!ins || ins.ply !== rules.history().length) return null;
-  const tok = ins.sq != null ? rules.board()[ins.sq] : rules.captured()[ins.cap];
+/** { sq } | { cap } の駒のトークン (空きマスなら null) */
+function tokenOf(ref) {
+  const tok = ref.sq != null ? state.rules.board()[ref.sq] : state.rules.captured()[ref.cap];
   return tok && tok !== "." ? tok : null;
+}
+
+/**
+ * 状態欄の 2 行目に出す駒: 選択中の自分の駒 > マウスを乗せている駒 > タップした相手の駒・取った駒。
+ * 取った駒なら captured = true
+ */
+function lookedAt() {
+  const { rules } = state;
+  const ins = state.inspect?.ply === rules.history().length ? state.inspect : null;
+  for (const ref of [state.selected != null ? { sq: state.selected } : null, state.hover, ins]) {
+    const tok = ref && tokenOf(ref);
+    if (tok) return { tok, captured: ref.cap != null };
+  }
+  return null;
+}
+
+/** 選択中の駒をマウス (または指) の下のマスへ動かした後の種類。候補が複数 (成り等) なら全部 */
+function afterMove() {
+  const { rules } = state;
+  const from = state.selected;
+  const to = state.hover?.sq;
+  if (from == null || to == null || to === from || !canMove()) return [];
+  const prefix = sqName(from) + sqName(to);
+  const out = [];
+  for (const code of playableMoves().filter((m) => m.slice(0, 4) === prefix)) {
+    if (!rules.play(code)) continue;
+    const tok = rules.board()[to];
+    rules.undo();
+    if (!out.includes(tok)) out.push(tok);
+  }
+  return out;
 }
 
 const inspecting = (key, v) => state.inspect?.[key] === v && state.inspect.ply === state.rules.history().length;
@@ -253,9 +303,28 @@ function resultText(st, turn) {
   return t(winner === state.player ? "youWin" : "youLose", { how });
 }
 
+/**
+ * 状態欄: 1 行目に対局状況 (手番・チェック・決着など)、2 行目に見ている駒の重ね合わせ、
+ * 3 行目に選択中の駒を動かした後の重ね合わせ (→ …)
+ */
+function setStatus(main, thinking = false) {
+  const line = (cls, text) => {
+    const el = document.createElement(cls === "st-piece" ? "strong" : "span");
+    el.className = cls;
+    el.textContent = text;
+    return el;
+  };
+  const looked = state.rules && !state.error ? lookedAt() : null;
+  const piece = looked ? (looked.captured ? t("captured", { desc: describe(looked.tok) }) : describe(looked.tok)) : "";
+  const after = state.rules && !state.error && !thinking ? afterMove() : [];
+  statusEl.classList.toggle("thinking", thinking);
+  statusEl.replaceChildren(line("st-main", main));
+  if (piece) statusEl.append(line("st-piece", piece));
+  if (after.length) statusEl.append(line("st-after", "→ " + after.map(describe).join(" / ")));
+}
+
 function renderStaging() {
-  statusEl.textContent = t("staging");
-  statusEl.classList.add("thinking");
+  setStatus(t("staging"), true);
   $("undo").disabled = false;
 }
 
@@ -284,31 +353,19 @@ function renderStatus() {
   const { rules } = state;
   const st = rules.status();
   const turn = rules.turn();
-  statusEl.classList.remove("thinking");
-  const tok = activeToken();
-  const isCap = state.selected == null && state.inspect?.cap != null;
-  const desc = tok ? (isCap ? t("captured", { desc: describe(tok) }) : describe(tok)) : "";
   if (state.error) {
-    statusEl.textContent = t(state.error.key, state.error.vars);
+    setStatus(t(state.error.key, state.error.vars));
   } else if (winnerOf(st, turn)) {
-    statusEl.textContent = resultText(st, turn);
+    setStatus(resultText(st, turn));
   } else if (st !== "ongoing") {
-    statusEl.textContent = t(st);
+    setStatus(t(st));
   } else if (state.thinking) {
-    statusEl.textContent = t("thinking");
-    statusEl.classList.add("thinking");
+    setStatus(t("thinking"), true);
   } else if (engineTurn()) {
-    statusEl.textContent = t("engineLoading");
+    setStatus(t("engineLoading"));
   } else {
     const key = state.opponent === "engine" ? "toMoveYou" : "toMove";
-    statusEl.textContent = t(key, { color: colorName(turn) }) + (rules.inCheck() ? t("check") : "");
-  }
-  if (desc && !state.error) {
-    // 見ている駒の重ね合わせを太字で 1 行目に出す
-    const b = document.createElement("strong");
-    b.className = "active-desc";
-    b.textContent = desc;
-    statusEl.prepend(b);
+    setStatus(t(key, { color: colorName(turn) }) + (rules.inCheck() ? t("check") : ""));
   }
   $("undo").disabled = rules.history().length === 0;
 }
@@ -335,7 +392,7 @@ function choiceLabel(code, all) {
 
 async function tryMove(from, to) {
   const prefix = sqName(from) + sqName(to);
-  const cands = state.rules.legalMoves().filter((m) => m.slice(0, 4) === prefix);
+  const cands = playableMoves().filter((m) => m.slice(0, 4) === prefix);
   if (cands.length === 0) return false;
   let code = cands[0];
   if (cands.length > 1) {
@@ -403,6 +460,7 @@ function askChoice(title, options) {
 let drag = null;
 
 boardEl.addEventListener("pointerdown", (ev) => {
+  if (ev.button !== 0) return; // 右クリックは重ね合わせの一覧表示用
   const el = ev.target.closest(".sq");
   if (!el) return;
   const sq = Number(el.dataset.sq);
@@ -432,7 +490,18 @@ boardEl.addEventListener("pointerdown", (ev) => {
   boardEl.setPointerCapture(ev.pointerId);
 });
 
+/** マウス (ドラッグ中は指) の下の駒を覚えて、状態欄の 2・3 行目を更新する */
+function setHover(ref) {
+  if (JSON.stringify(state.hover) === JSON.stringify(ref)) return;
+  state.hover = ref;
+  if (state.rules && !state.animating) renderStatus();
+}
+
 boardEl.addEventListener("pointermove", (ev) => {
+  if (ev.pointerType === "mouse" || drag) {
+    const el = document.elementFromPoint(ev.clientX, ev.clientY)?.closest(".sq");
+    setHover(el ? { sq: Number(el.dataset.sq) } : null);
+  }
   if (!drag) return;
   if (!drag.moved && Math.hypot(ev.clientX - drag.x, ev.clientY - drag.y) > 4) {
     drag.moved = true;
@@ -443,7 +512,12 @@ boardEl.addEventListener("pointermove", (ev) => {
   drag.ghost.style.top = ev.clientY + "px";
 });
 
+boardEl.addEventListener("pointerleave", (ev) => {
+  if (!drag) setHover(null);
+});
+
 function endDrag(ev) {
+  if (ev.pointerType !== "mouse") setHover(null);
   if (!drag) return;
   const d = drag;
   drag = null;
@@ -462,7 +536,39 @@ for (const id of ["captured-top", "captured-bottom"]) {
     const c = ev.target.closest(".cap");
     if (c) inspectAt("cap", Number(c.dataset.i), true);
   });
+  $(id).addEventListener("pointerover", (ev) => {
+    const c = ev.target.closest(".cap");
+    if (ev.pointerType === "mouse") setHover(c ? { cap: Number(c.dataset.i) } : null);
+  });
+  $(id).addEventListener("pointerleave", () => setHover(null));
 }
+
+// 盤の外をタップ (クリック) したら選択を外す (スマホで選択を解除する手段)。
+// 盤のクリックで盤が描き直されるとクリックしたマスが盤から外れて「盤の外」に見えるので、
+// 盤の処理より先に (キャプチャ段階で) 判定する
+document.addEventListener(
+  "pointerdown",
+  (ev) => {
+    if (ev.button !== 0 || ev.target.closest("#board, .captured, dialog")) return;
+    if (state.selected == null && state.inspect == null) return;
+    state.selected = null;
+    state.inspect = null;
+    if (state.rules && !state.animating) render();
+  },
+  true,
+);
+
+// 右クリックを押している間は、全部の駒の重ね合わせを円形に並べて見せる
+const boardWrap = document.querySelector(".board-wrap");
+boardWrap.addEventListener("contextmenu", (ev) => ev.preventDefault());
+boardWrap.addEventListener("pointerdown", (ev) => {
+  if (ev.button === 2) document.body.classList.add("peek");
+});
+const endPeek = () => document.body.classList.remove("peek");
+document.addEventListener("pointerup", (ev) => {
+  if (ev.button === 2) endPeek();
+});
+window.addEventListener("blur", endPeek);
 boardEl.addEventListener("pointercancel", endDrag);
 
 // ---- エンジン -----------------------------------------------------------
@@ -632,6 +738,10 @@ $("copy-pgn").onclick = async () => {
   }
 };
 for (const id of SETTINGS) $(id).addEventListener("input", id === "lang" ? applyLang : updateSettingsUI);
+$("guard").addEventListener("change", () => {
+  playableCache.key = null;
+  if (state.rules) render();
+});
 
 // ---- 起動 ---------------------------------------------------------------
 async function main() {

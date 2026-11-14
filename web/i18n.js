@@ -24,6 +24,7 @@ const en = {
   undo: "Undo",
   flip: "Flip board",
   copy: "Copy game record",
+  guard: "Block moves that leave none of your pieces on the board able to be the king",
   copied: "Copied",
   recordPrompt: "Game record",
 
@@ -116,6 +117,7 @@ const ja = {
   undo: "待った",
   flip: "盤を反転",
   copy: "棋譜をコピー",
+  guard: "自分の盤上の駒がどれもキングでありえなくなる手を指せなくする",
   copied: "コピーしました",
   recordPrompt: "棋譜",
 
@@ -142,7 +144,7 @@ const ja = {
   kind_k: "キング",
   kindSep: "・",
   describe: "{color}: {kinds}",
-  captured: "取られた駒 — {desc}",
+  captured: "取った駒 — {desc}",
 
   stalemate: "ステイルメイトで引き分け",
   fifty: "50 手ルールで引き分け",
