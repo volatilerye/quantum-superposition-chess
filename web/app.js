@@ -75,6 +75,8 @@ function saveSettings() {
 function updateSettingsUI() {
   // 手番はエンジン対局と、オンライン対戦で招待する側が選ぶ
   $("color-box").hidden = !["engine", "online"].includes($("opponent").value);
+  // CPU の強さは「対CPU」を選んでいるときだけ
+  $("cpu-box").hidden = $("opponent").value !== "engine";
   saveSettings();
 }
 
