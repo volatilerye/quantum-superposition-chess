@@ -137,6 +137,7 @@ const en = {
   toMove: "{color} to move",
   toMoveYou: "{color} to move (you)",
   check: " — Check!",
+  cpuDepth: " — the CPU searched {depth} moves ahead",
 
   whichMove: "Which move do you mean?",
   cancel: "Cancel",
@@ -300,6 +301,7 @@ const ja = {
   toMove: "{color}番",
   toMoveYou: "{color}番（あなた）",
   check: " — チェック！",
+  cpuDepth: "（CPU は {depth} 手先まで読みました）",
 
   whichMove: "どの動きにしますか？",
   cancel: "キャンセル",
