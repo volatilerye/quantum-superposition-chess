@@ -63,8 +63,10 @@ pub extern "C" fn output_ptr() -> *const u8 {
 
 /// 初期局面 (全駒が重ね合わせ) から新しい対局を始める
 #[no_mangle]
-pub extern "C" fn new_game() {
-    unsafe { *G.game.get() = Some(Game::default()) };
+pub extern "C" fn new_game(setup: u32) {
+    // setup: ビット 0 = 白を通常のチェスの配置に、ビット 1 = 黒を通常のチェスの配置に (0 なら両方とも重ね合わせ)
+    let classical = [setup & 1 != 0, setup & 2 != 0];
+    unsafe { *G.game.get() = Some(Game::with_setup(classical)) };
 }
 
 /// 入力バッファの手 (e2e4 / e7e8q / e1g1c / e5d6e) を指す。成功なら表記を出力し長さを返す。不正手は 0
@@ -125,6 +127,12 @@ pub extern "C" fn preview() -> usize {
     }
 }
 
+/// 手番側の駒を from から to (0..64) へ動かせない理由 (Position::why_not)。合法手があれば 0
+#[no_mangle]
+pub extern "C" fn why_not(from: u32, to: u32) -> usize {
+    output(&game().pos().why_not(from as u8, to as u8))
+}
+
 /// 0 = 白番, 1 = 黒番
 #[no_mangle]
 pub extern "C" fn side_to_move() -> i32 {
@@ -138,7 +146,7 @@ pub extern "C" fn in_check() -> i32 {
 }
 
 /// 0 進行中 / 1 チェックメイト / 2 ステイルメイト / 3 50 手 / 4 千日手 / 5 駒不足 / 6 キング捕獲
-/// / 7 自分のキングの喪失が確定 (1 と 6 は手番側の負け、7 は直前に指した側の負け)
+/// / 7 自分のキングの喪失が確定 / 8 対消滅 (1 と 6 は手番側の負け、7 は直前に指した側の負け、8 は引き分け)
 #[no_mangle]
 pub extern "C" fn status() -> i32 {
     game().status() as i32
@@ -171,7 +179,7 @@ mod tests {
 
     #[test]
     fn ffi_flow() {
-        new_game();
+        new_game(0);
         assert_eq!(out(board()).split(' ').count(), 64);
         assert!(out(board()).starts_with("wpnbrqk "));
         assert_eq!(out(play(put("b1c3"))), "b1-c3(N)");

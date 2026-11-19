@@ -24,6 +24,7 @@ const state = {
   rules: null,
   engine: null,
   opponent: "engine", // "engine" | "human"
+  setup: 0, // 初期配置 (ビット 0 = 白を通常のチェスの配置に、ビット 1 = 黒を通常のチェスの配置に)
   player: "w", // エンジン対局でのこちらの色
   flipped: false,
   selected: null,
@@ -38,7 +39,7 @@ const state = {
 };
 
 // ---- 設定の保存 ---------------------------------------------------------
-const SETTINGS = ["lang", "opponent", "color", "level", "guard", "overlay"];
+const SETTINGS = ["lang", "opponent", "setup", "color", "level", "guard", "overlay"];
 
 /**
  * 強さレベル n (1〜10): 「思考 n 秒以内」か「深さ n 手以内」の先に達した方で止める。
@@ -100,7 +101,7 @@ function playableMoves() {
   const { rules } = state;
   const all = rules.legalMoves();
   if (!$("guard").checked) return all;
-  const key = rules.history().join(" ");
+  const key = state.setup + "|" + rules.history().join(" ");
   if (playableCache.key === key) return playableCache.moves;
   const safe = all.filter((code) => {
     if (!rules.play(code)) return true;
@@ -159,6 +160,26 @@ function lookedAt() {
   return null;
 }
 
+/**
+ * 選択中の駒をマウス (または指) の下のマスへ動かせないときの理由。動かせる・対象外なら ""。
+ * 自分の駒があるマスは (クリックするとその駒を選び直すだけなので) 説明しない
+ */
+function whyNotHere() {
+  const { rules } = state;
+  const from = state.selected;
+  const to = state.hover?.sq;
+  if (from == null || to == null || to === from || !canMove()) return "";
+  const prefix = sqName(from) + sqName(to);
+  if (playableMoves().some((m) => m.startsWith(prefix))) return "";
+  if (rules.legalMoves().some((m) => m.startsWith(prefix))) return t("whyGuard");
+  const r = rules.whyNot(from, to);
+  if (!r || r.kind === "own") return "";
+  if (r.kind === "check") return t("whyCheck", { sq: r.sq });
+  if (r.kind === "castle") return t("whyCastle");
+  const { kinds } = parseToken(rules.board()[from]);
+  return t("whyReach", { kinds: kinds.map(kindName).join(t("kindSep")) });
+}
+
 /** 選択中の駒をマウス (または指) の下のマスへ動かした後の種類。候補が複数 (成り等) なら全部 */
 function afterMove() {
   const { rules } = state;
@@ -201,7 +222,8 @@ function render(stage = null) {
   const lastSqs = last ? [sqIndex(last.slice(0, 2)), sqIndex(last.slice(2, 4))] : [];
   const targets = state.selected != null ? legalTargets(state.selected) : [];
   const turn = rules.turn();
-  const checkSq = !stage && rules.inCheck() ? board.indexOf(turn + "k") : -1;
+  // チェックされている駒 (盤上で最後のキング候補。キングに確定しているとは限らない)
+  const checkSq = !stage && rules.inCheck() ? board.findIndex((tk) => tk[0] === turn && tk.includes("k")) : -1;
 
   boardEl.replaceChildren();
   for (let row = 0; row < 8; row++) {
@@ -271,7 +293,7 @@ function renderCaptured(stage = null) {
 /** staging = true のときは、最後の手の王手・決着の記号 (+ # †) をまだ見せない */
 function renderMoves(staging = false) {
   const notes = state.rules.notations();
-  if (staging && notes.length) notes[notes.length - 1] = notes[notes.length - 1].replace(/[+#†]$/, "");
+  if (staging && notes.length) notes[notes.length - 1] = notes[notes.length - 1].replace(/[+#†∅]$/, "");
   const ol = $("moves");
   ol.replaceChildren();
   for (let i = 0; i < notes.length; i += 2) {
@@ -317,10 +339,12 @@ function setStatus(main, thinking = false) {
   const looked = state.rules && !state.error ? lookedAt() : null;
   const piece = looked ? (looked.captured ? t("captured", { desc: describe(looked.tok) }) : describe(looked.tok)) : "";
   const after = state.rules && !state.error && !thinking ? afterMove() : [];
+  const why = state.rules && !state.error && !thinking && !after.length ? whyNotHere() : "";
   statusEl.classList.toggle("thinking", thinking);
   statusEl.replaceChildren(line("st-main", main));
   if (piece) statusEl.append(line("st-piece", piece));
   if (after.length) statusEl.append(line("st-after", "→ " + after.map(describe).join(" / ")));
+  else if (why) statusEl.append(line("st-reason", why));
 }
 
 function renderStaging() {
@@ -594,7 +618,7 @@ async function maybeEngineMove() {
   const started = performance.now();
   let r;
   try {
-    r = await engine.search(rules.history(), ...levelLimits());
+    r = await engine.search(rules.history(), ...levelLimits(), state.setup);
   } catch (e) {
     if (token !== state.token) return; // 取り消し
     state.thinking = false;
@@ -645,7 +669,7 @@ document.addEventListener("keydown", (ev) => {
 async function analyze() {
   if (!state.debug || !state.analyzer || !state.rules) return;
   const hist = state.rules.history();
-  const key = hist.join(" ") + "|" + state.rules.status();
+  const key = state.setup + "|" + hist.join(" ") + "|" + state.rules.status();
   if (key === analysisKey) return;
   analysisKey = key;
   const box = $("debug");
@@ -657,7 +681,7 @@ async function analyze() {
   box.textContent = t("analyzing");
   const color = state.rules.turn();
   try {
-    const r = await state.analyzer.search(hist, ...ANALYSIS_LIMITS);
+    const r = await state.analyzer.search(hist, ...ANALYSIS_LIMITS, state.setup);
     if (key !== analysisKey) return;
     const m = r.move;
     const move = `${m.slice(0, 2)}-${m.slice(2, 4)}` + ({ q: "=Q", r: "=R", b: "=B", n: "=N", c: " (O-O)", e: " e.p." }[m[4]] ?? "");
@@ -677,7 +701,8 @@ function newGame() {
   state.selected = null;
   state.inspect = null;
   state.error = null;
-  state.rules.newGame();
+  state.setup = Number($("setup").value);
+  state.rules.newGame(state.setup);
   render();
   saveSettings();
   maybeEngineMove();
@@ -715,6 +740,7 @@ function kifu() {
   const headers = [
     `[Event "Casual game"]`,
     `[Variant "Quantum superposition chess"]`,
+    `[Setup "${["both superposed", "white classical", "black classical", "both classical"][state.setup]}"]`,
     `[Date "${date}"]`,
     `[White "${name("w")}"]`,
     `[Black "${name("b")}"]`,
@@ -762,6 +788,8 @@ async function main() {
     return;
   }
   state.opponent = $("opponent").value;
+  state.setup = Number($("setup").value);
+  state.rules.newGame(state.setup);
   const c = $("color").value;
   state.player = c === "r" ? (Math.random() < 0.5 ? "w" : "b") : c;
   state.flipped = state.opponent === "engine" && state.player === "b";

@@ -451,6 +451,9 @@ impl Searcher<'_> {
         if self.time_up() {
             return 0;
         }
+        if pos.king_candidates(pos.stm) == 0 && pos.king_candidates(pos.stm ^ 1) == 0 {
+            return 0; // 対消滅 (引き分け)
+        }
         if pos.king_candidates(pos.stm ^ 1) == 0 {
             return MATE - ply; // 直前に指した側が自分のキングの喪失を確定させた
         }
@@ -579,6 +582,9 @@ impl Searcher<'_> {
     fn quiesce(&mut self, pos: &Position, mut alpha: i32, beta: i32, ply: i32, left: u32) -> i32 {
         if self.time_up() {
             return 0;
+        }
+        if pos.king_candidates(pos.stm) == 0 && pos.king_candidates(pos.stm ^ 1) == 0 {
+            return 0; // 対消滅 (引き分け)
         }
         if pos.king_candidates(pos.stm ^ 1) == 0 {
             return MATE - ply; // 直前に指した側が自分のキングの喪失を確定させた

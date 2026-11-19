@@ -164,6 +164,8 @@ pub enum Status {
     KingCaptured = 6,
     /// 直前に指した側が、自分の手で「自分のキングはすでに取られていた」と確定させた。指した側の負け
     KingRevealed = 7,
+    /// 1 手で両者の盤上の駒のどれもキングでありえなくなった (対消滅)。引き分け
+    Annihilation = 8,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -196,6 +198,24 @@ impl Position {
             board[sq as usize] = id as u8 + 1;
         }
         Position { pieces, board, stm: WHITE, ep: None, halfmove: 0, fullmove: 1 }
+    }
+
+    /// 初期配置。`classical[c]` が true の色は通常のチェスの配置 (重ね合わせなし)、false なら全部の駒が重ね合わせ
+    pub fn start_with(classical: [bool; 2]) -> Self {
+        let mut p = Self::start();
+        const BACK: [u8; 8] = [R_, N_, B_, Q_, K_, B_, N_, R_];
+        for c in [WHITE, BLACK] {
+            if !classical[c as usize] {
+                continue;
+            }
+            for i in Self::ids(c) {
+                let pc = &mut p.pieces[i];
+                let (f, r) = (pc.sq % 8, pc.sq / 8);
+                pc.domain = if r == 1 || r == 6 { P_ } else { BACK[f as usize] };
+            }
+        }
+        // 片方だけ通常配置でも、もう片方は全種類の重ね合わせのまま (色ごとに独立)
+        p
     }
 
     pub fn piece_at(&self, sq: u8) -> Option<usize> {
@@ -333,12 +353,31 @@ impl Position {
         Self::ids(by).any(|i| self.pieces[i].alive() && self.can_hit(i, sq))
     }
 
-    /// 手番側のキング (確定している場合のみ) に王手がかかっているか
+    /// 手番側がチェックされているか
     pub fn in_check(&self) -> bool {
-        match self.definite_king(self.stm) {
-            Some(k) => self.attacked(k, self.stm ^ 1),
-            None => false,
+        self.checked(self.stm)
+    }
+
+    /// 色 `c` がチェックされているか: 盤上のキング候補が 1 枚だけで、その駒が相手の駒に
+    /// (ありうる種類のどれかで) 利かされている。確定したキングは必ず唯一のキング候補なので通常のチェックも含む。
+    /// 相手の次の手でその駒を取られる (キング喪失・対消滅) のを防ぐため、チェックを残す手は指せない
+    pub fn checked(&self, c: u8) -> bool {
+        self.last_king_candidate(c).map_or(false, |s| self.attacked(s, c ^ 1))
+    }
+
+    /// 盤上のキング候補が 1 枚だけならそのマス
+    pub fn last_king_candidate(&self, c: u8) -> Option<u8> {
+        let mut only = None;
+        for i in Self::ids(c) {
+            let p = &self.pieces[i];
+            if p.alive() && p.promoted == 0 && p.domain & K_ != 0 {
+                if only.is_some() {
+                    return None;
+                }
+                only = Some(p.sq);
+            }
         }
+        only
     }
 
     // ---- 指し手生成 -----------------------------------------------------------
@@ -454,7 +493,8 @@ impl Position {
 
             // キャスリング: 同じ段にある未移動のキング候補と未移動のルーク候補で、間に 2 マス以上の空き
             // (駒はない) があるとき。キングはルークの方へ 2 マス動き、ルークはキングがまたいだマスへ移る。
-            // キング候補のいるマス・またぐマス・行き先のマスは、相手のどの駒の (ありうる種類の) 利きもないこと
+            // キング候補がチェックされていない (チェックはキングに確定した駒にだけかかる) こと、
+            // またぐマスと行き先のマスに相手のどの駒の (ありうる種類の) 利きもないこと
             if !p.moved && p.promoted == 0 && p.domain & K_ != 0 {
                 for dir in [1i8, -1] {
                     let Some((rook_sq, gap)) = self.castle_partner(from, dir) else { continue };
@@ -464,7 +504,9 @@ impl Position {
                     }
                     let pass = at(f + dir, r).unwrap();
                     let king_to = at(f + 2 * dir, r).unwrap();
-                    if [from, pass, king_to].iter().all(|&s| !self.attacked(s, them)) {
+                    // このキング候補が盤上で最後のキング候補なら、利かされている (チェック) と指せない
+                    let checked = self.king_candidates(us) == 1 && self.attacked(from, them);
+                    if !checked && [pass, king_to].iter().all(|&s| !self.attacked(s, them)) {
                         out.push(Move { from, to: king_to, promo: 0, special: Special::Castle, mask: K_ });
                     }
                 }
@@ -610,13 +652,38 @@ impl Position {
         if m.special == Special::Castle && !n.feasible(us) {
             return None;
         }
-        // 確定したキングを利きに残す手は不可
-        if let Some(k) = n.definite_king(us) {
-            if n.attacked(k, us ^ 1) {
-                return None;
-            }
+        // チェック (盤上で最後のキング候補が利かされている状態) を残す手は不可
+        if n.checked(us) {
+            return None;
         }
         Some(n)
+    }
+
+    /// 手番側の駒を `from` から `to` へ動かせない理由 (UI の説明用)。
+    /// "" = 合法手がある / "own" = 自分の駒がある / "reach" = ありうる種類のどれとしても届かない /
+    /// "castle" = キャスリングの割り当てが成り立たない / "check <マス>" = 指すとそのマスの最後のキング候補がチェックされる
+    pub fn why_not(&self, from: u8, to: u8) -> String {
+        if self.piece_at(to).map_or(false, |i| self.pieces[i].color == self.stm) {
+            return "own".into();
+        }
+        let cands: Vec<Move> = self.pseudo_legal().into_iter().filter(|m| m.from == from && m.to == to).collect();
+        if cands.is_empty() {
+            return "reach".into();
+        }
+        let us = self.stm;
+        let mut reason = String::new();
+        for m in cands {
+            if self.play_legal(m).is_some() {
+                return String::new();
+            }
+            let n = self.apply(m);
+            if let Some(s) = n.last_king_candidate(us).filter(|_| n.checked(us)) {
+                reason = format!("check {}", sq_name(s));
+            } else if reason.is_empty() {
+                reason = "castle".into();
+            }
+        }
+        reason
     }
 
     /// 置換表用のハッシュ (駒の位置・ありうる種類・成り・未移動、手番、アンパッサン)
@@ -678,7 +745,10 @@ impl Position {
                 s
             }
         };
-        if n.king_candidates(us_of(&n)) == 0 {
+        if n.king_candidates(WHITE) == 0 && n.king_candidates(BLACK) == 0 {
+            // 対消滅 (引き分け)
+            s.push('∅');
+        } else if n.king_candidates(us_of(&n)) == 0 {
             // 自分のキングがすでに取られていたことが確定した (指した側の負け)
             s.push('†');
         } else if n.king_candidates(n.stm) == 0 {
@@ -740,6 +810,11 @@ impl Default for Game {
 }
 
 impl Game {
+    /// 初期配置を指定して始める (Position::start_with)
+    pub fn with_setup(classical: [bool; 2]) -> Self {
+        Game { history: vec![Position::start_with(classical)], moves: vec![], notes: vec![] }
+    }
+
     pub fn pos(&self) -> &Position {
         self.history.last().unwrap()
     }
@@ -816,6 +891,9 @@ impl Game {
 
     pub fn status(&self) -> Status {
         let pos = self.pos();
+        if pos.king_candidates(WHITE) == 0 && pos.king_candidates(BLACK) == 0 {
+            return Status::Annihilation;
+        }
         // 指した側のキングが過去に取られていたと確定した場合を先に見る (取られたのはこの手より前なので)
         if pos.king_candidates(pos.stm ^ 1) == 0 {
             return Status::KingRevealed;
@@ -867,6 +945,21 @@ mod tests {
             p.prune(c);
         }
         p
+    }
+
+    #[test]
+    fn classical_setup() {
+        let mut g = Game::with_setup([true, false]);
+        assert_eq!(kinds_at(&g, "e1"), "K");
+        assert_eq!(kinds_at(&g, "b1"), "N");
+        assert_eq!(kinds_at(&g, "e2"), "P");
+        assert_eq!(kinds_at(&g, "e8"), "PNBRQK");
+        // 通常のチェスと同じ初手の数 (20 手)
+        assert_eq!(g.pos().legal_moves().len(), 20);
+        assert_eq!(g.play("e2e4").as_deref(), Some("e2-e4(P)"));
+        let g = Game::with_setup([true, true]);
+        assert!(!g.pos().in_check());
+        assert_eq!(g.status(), Status::Ongoing);
     }
 
     #[test]
@@ -939,9 +1032,54 @@ mod tests {
             assert_eq!(m.from, sq("e1"), "only king moves: {}", m.code());
             assert_ne!(file(m.to), 4);
         }
-        // キングが未確定なら王手はない
+        // キングが未確定でも、盤上で最後のキング候補ならチェック
         let p = custom(&[("e1", K_ | Q_), ("a2", P_)], &[("e8", R_), ("h8", K_)]);
+        assert!(p.in_check());
+        // キング候補が 2 枚以上残っていればチェックではない
+        let p = custom(&[("e1", K_ | Q_), ("a2", K_ | P_)], &[("e8", R_), ("h8", K_)]);
         assert!(!p.in_check());
+    }
+
+    /// 最後のキング候補を利きにさらす手 (相手に取られる・対消滅される手) は指せない
+    #[test]
+    fn why_not_explains_illegal_moves() {
+        let p = custom(&[("e4", K_ | Q_), ("e5", N_), ("a1", R_)], &[("e8", R_), ("h8", K_)]);
+        assert_eq!(p.why_not(sq("e5"), sq("c6")), "check e4"); // ピンされたナイト
+        assert_eq!(p.why_not(sq("e5"), sq("e6")), "reach"); // ナイトは前に 1 マス進めない
+        assert_eq!(p.why_not(sq("a1"), sq("e4")), "own");
+        assert_eq!(p.why_not(sq("e5"), sq("e5")), "own");
+        assert_eq!(p.why_not(sq("a1"), sq("a8")), "");
+    }
+
+    #[test]
+    fn cannot_expose_last_king_candidate() {
+        // 白の最後のキング候補 e4 (QK)。e5 の白ナイトが、e8 の黒ルークの利きを塞いでいる
+        let p = custom(&[("e4", K_ | Q_), ("e5", N_)], &[("e8", R_), ("h8", K_)]);
+        assert!(!p.in_check());
+        assert!(!p.legal_moves().iter().any(|m| m.from == sq("e5")), "the knight is pinned");
+        // 最後のキング候補自身も、キングでありうるまま利かされるマス (a5 の黒ルークの利く 5 段目) へは動けない
+        let p = custom(&[("e4", K_ | Q_)], &[("a5", R_), ("h1", K_)]);
+        let to = |t: &str| p.legal_moves().iter().any(|m| m.from == sq("e4") && m.to == sq(t));
+        assert!(!to("e5") && !to("d5") && !to("f5"));
+        assert!(to("e3"));
+    }
+
+    #[test]
+    fn annihilation_is_a_draw() {
+        // 白: d4 (RQK) と取られた RQK。黒: 最後のキング候補 d7 (QK)。
+        // d4xd7 は 3 マスの縦移動でキングではなくなり、白も黒も盤上のキング候補が 0 になる
+        let mut p = custom(&[("d4", R_ | Q_ | K_), ("a1", R_ | Q_), ("h1", R_ | Q_)], &[("d7", Q_ | K_), ("a8", R_)]);
+        // 取られた白の駒のうち 1 枚を RQK にする (キングはそれか d4)
+        let off = (0..16).find(|&i| !p.pieces[i].alive()).unwrap();
+        for i in 0..16 {
+            if !p.pieces[i].alive() {
+                p.pieces[i].domain = if i == off { R_ | Q_ | K_ } else { P_ | N_ | B_ };
+            }
+        }
+        p.prune(WHITE);
+        let mut g = Game { history: vec![p], moves: vec![], notes: vec![] };
+        assert_eq!(g.play("d4d7").as_deref(), Some("d4xd7(RQ)∅"));
+        assert_eq!(g.status(), Status::Annihilation);
     }
 
     #[test]
@@ -1013,12 +1151,24 @@ mod tests {
         let mut p = custom(&[("e1", K_ | Q_), ("h1", R_ | Q_)], &[("h8", K_)]);
         unmoved(&mut p, &["e1"]);
         assert!(castles(&p).is_empty());
-        // キング候補が利かされている (チェック) / またぐマスが利かされている / 行き先が利かされている
-        for (s, kind) in [("e5", R_ | Q_), ("f5", R_ | Q_), ("g5", R_)] {
+        // またぐマスが利かされている / 行き先が利かされている
+        for (s, kind) in [("f5", R_ | Q_), ("g5", R_)] {
             let mut p = custom(&[("e1", K_ | Q_), ("h1", R_ | Q_)], &[("h8", K_), (s, kind)]);
             unmoved(&mut p, &["e1", "h1"]);
             assert!(castles(&p).is_empty(), "attacked from {s}");
         }
+        // キングに確定した駒がチェックされている
+        let mut p = custom(&[("e1", K_), ("h1", R_ | Q_)], &[("h8", K_), ("e5", R_)]);
+        unmoved(&mut p, &["e1", "h1"]);
+        assert!(castles(&p).is_empty());
+        // 盤上で最後のキング候補が利かされている (チェック) と指せない
+        let mut p = custom(&[("e1", K_ | Q_), ("h1", R_ | Q_)], &[("h8", K_), ("e5", R_ | Q_)]);
+        unmoved(&mut p, &["e1", "h1"]);
+        assert!(castles(&p).is_empty());
+        // ほかにもキング候補がいればチェックではないので、いるマスが利かされていても指せる
+        let mut p = custom(&[("e1", K_ | Q_), ("h1", R_ | Q_), ("a2", K_ | P_)], &[("h8", K_), ("e5", R_ | Q_)]);
+        unmoved(&mut p, &["e1", "h1"]);
+        assert_eq!(castles(&p), vec!["e1g1c"]);
         // 利きのないマスからなら指せる
         let mut p = custom(&[("e1", K_ | Q_), ("h1", R_ | Q_)], &[("h8", K_), ("a5", N_)]);
         unmoved(&mut p, &["e1", "h1"]);

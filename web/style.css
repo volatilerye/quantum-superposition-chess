@@ -182,6 +182,7 @@ body:not(.overlay) .piece.super .g {
 }
 .status > * { display: block; }
 .status .st-after { color: var(--muted); }
+.status .st-reason { color: #f2c94c; } /* 指せない理由 (黄色) */
 .status.thinking .st-main::after {
   content: "…";
   animation: blink 1s infinite;
@@ -238,7 +239,7 @@ fieldset p { margin: 4px 0 0; }
 
 
 .moves {
-  max-height: 130px;
+  max-height: 110px;
   overflow-y: auto;
   margin: 0;
   padding: 6px 0 6px 2.4em;

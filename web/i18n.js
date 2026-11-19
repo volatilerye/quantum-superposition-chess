@@ -16,6 +16,11 @@ const en = {
   optWhite: "White (moves first)",
   optBlack: "Black (moves second)",
   optRandom: "Random",
+  setup: "Setup",
+  setup0: "Both superposed",
+  setup1: "Only White classical",
+  setup2: "Only Black classical",
+  setup3: "Both classical",
   start: "Start",
   engine: "Engine",
   strength: "Strength",
@@ -30,17 +35,20 @@ const en = {
   recordPrompt: "Game record",
 
   rules: "Rules",
-  rule1: "Every piece in the starting position is a superposition of pawn, knight, bishop, rook, queen and king.",
+  rule1:
+    "Every piece in the starting position is a superposition of pawn, knight, bishop, rook, queen and king. (With the “Setup” option, either side can instead start from the classical chess position.)",
   rule2:
     "A piece moves as one of the kinds in its superposition. After the move, every kind inconsistent with that move is removed (e.g. a knight's jump collapses the piece to a knight).",
   rule3:
     "Each side's pieces must be assignable to the standard starting set (8 pawns, 2 knights, 2 bishops, 2 rooks, 1 queen, 1 king). Kinds that become impossible are removed even from unmoved and captured pieces.",
   rule4:
-    "Check applies only to a piece confirmed as the king. You win when none of your opponent's pieces on the board can be the king (i.e. you have captured it).",
+    "Check: when only one of your pieces on the board can still be the king, you are in check if that piece is attacked, whether or not it has been confirmed as the king (a superposed enemy piece attacks a square if any of its possible kinds does). You may not leave yourself in check or move into check. If you are in check and have no move that gets you out of it, you are checkmated and lose.",
   rule5:
     "If your own move leaves none of your pieces on the board able to be the king (i.e. it confirms that a captured piece was your king), you lose on that move (marked “†” in the record).",
   rule6:
     "Castling: possible with an unmoved king candidate and an unmoved rook candidate on the same rank, with at least two empty squares and no other pieces between them. The king candidate must not be in check, and the square it passes and its destination must not be attacked (a superposed enemy piece attacks a square if any of its possible kinds does). The king moves two squares toward the rook, and the rook moves to the square the king passed. The two pieces collapse to a king and a rook. When the move can't be told apart from a rook or queen moving sideways (e.g. e1→g1), you choose which one you mean.",
+  rule8:
+    "Annihilation: if a single move leaves neither side with any piece on the board that can be the king, the game is a draw (marked “∅” in the record).",
   rule7:
     "A piece that has never moved may advance two squares as a pawn from its first rank as well as its second (e.g. b1→b3 for White, b8→b6 for Black). It can be captured en passant as usual.",
   hoverNote:
@@ -65,6 +73,7 @@ const en = {
   checkmate: "Checkmate",
   kingCaptured: "King captured",
   kingRevealed: "{loser}'s king turns out to have been captured already",
+  annihilation: "Draw by annihilation (neither side has a king left)",
   wins: "{how} — {winner} wins",
   youWin: "{how} — You win!",
   youLose: "{how} — You lose",
@@ -86,6 +95,10 @@ const en = {
   noPromote: "Don't promote (move as a non-pawn)",
   normalMove: "Normal move (as a non-pawn)",
   castleAlt: "Normal move (as a rook or queen)",
+  whyReach: "Can't move there as any of its possible kinds ({kinds})",
+  whyCheck: "Not allowed: your last king candidate on the board ({sq}) would be in check",
+  whyCastle: "Can't castle there: the king and rook can't both be confirmed",
+  whyGuard: "Blocked by the option: none of your pieces on the board could be the king after this move (you'd lose)",
 
   evalWin: "Eval: {color} is winning (depth {depth})",
   eval: "Eval: {value} (depth {depth})",
@@ -112,6 +125,11 @@ const ja = {
   optWhite: "白（先手）",
   optBlack: "黒（後手）",
   optRandom: "ランダム",
+  setup: "初期配置",
+  setup0: "両方とも重ね合わせ",
+  setup1: "白だけ通常配置",
+  setup2: "黒だけ通常配置",
+  setup3: "両方とも通常配置",
   start: "対局開始",
   engine: "エンジン",
   strength: "強さ",
@@ -126,15 +144,17 @@ const ja = {
   recordPrompt: "棋譜",
 
   rules: "ルール",
-  rule1: "初期配置の駒はすべて、ポーン・ナイト・ビショップ・ルーク・クイーン・キングの重ね合わせです。",
+  rule1: "初期配置の駒はすべて、ポーン・ナイト・ビショップ・ルーク・クイーン・キングの重ね合わせです（「初期配置」の設定で、どちらかの色または両方を通常のチェスの配置から始めることもできます）。",
   rule2: "駒は重ね合わせのどれか 1 種類として動きます。動いた後は、その動きと矛盾する種類が除外されます（例: ナイトの跳び方をしたらナイトに確定）。",
   rule3:
     "各色の駒は通常の初期配置の駒数（ポーン 8・ナイト 2・ビショップ 2・ルーク 2・クイーン 1・キング 1）に割り当てられなければならず、ありえなくなった種類は動いていない駒や取られた駒からも除外されます。",
-  rule4: "チェックはキングに確定した駒にだけ適用されます。相手の盤上の駒のどれもキングでありえなくなったら（＝キングを取ったら）勝ちです。",
+  rule4:
+    "チェック: 自分の盤上のキング候補が 1 枚だけになっているとき、その駒が相手の駒に利かされていればチェックです（キングに確定しているかどうかは問いません。相手の駒が重ね合わせのときは、ありうる種類のどれか 1 つでも利いていれば利かされているとみなします）。チェックを受けたままにする手や、チェックされにいく手は指せません。チェックを外す手がなければチェックメイトで負けです。",
   rule5:
     "自分の手で、自分の盤上の駒のどれもキングでありえなくなった場合（＝取られた駒がキングだったと確定した場合）は、その手を指した時点で負けです（棋譜では「†」）。",
   rule6:
     "キャスリング: 同じ段にある、一度も動いていないキング候補の駒とルーク候補の駒で指せます。間に 2 マス以上の空きがあり、敵味方どちらの駒も置かれていないことが条件です。また、キング候補がチェックされておらず、またぐマスと行き先のマスのどちらも相手の駒に利かされていない必要があります（相手の駒が重ね合わせのときは、ありうる種類のどれか 1 つでも利いていれば利かされているとみなします）。キングはルークの方へ 2 マス動き、ルークはキングがまたいだマスへ移ります。指すと、動いた 2 枚はそれぞれキングとルークに確定します。e1→g1 のようにルーク・クイーンとしての横移動と区別できない場合は、どちらとして指すかを選べます。",
+  rule8: "対消滅: 1 手で両者とも盤上の駒のどれもキングでありえなくなった場合は引き分けです（棋譜では「∅」）。",
   rule7: "一度も動いていない駒は、2 段目だけでなく 1 段目からもポーンとして 2 マス前進できます（白なら b1→b3、黒なら b8→b6 など）。通常どおりアンパッサンで取られることがあります。",
   hoverNote: "「半透明で重ねて表示」を ON にしているときは、駒にマウスを乗せると、ありうる種類を円形に並べて表示します。右クリックを押している間は、全部の駒をそう表示します。",
 
@@ -157,6 +177,7 @@ const ja = {
   checkmate: "チェックメイト",
   kingCaptured: "キングを取りました",
   kingRevealed: "{loser}のキングはすでに取られていたことが確定しました",
+  annihilation: "対消滅で引き分け（両者ともキングがいなくなりました）",
   wins: "{how} — {winner}の勝ち",
   youWin: "{how} — あなたの勝ちです！",
   youLose: "{how} — あなたの負けです",
@@ -177,6 +198,10 @@ const ja = {
   noPromote: "成らない（ポーン以外として動く）",
   normalMove: "通常の移動（ポーン以外として動く）",
   castleAlt: "通常の移動（ルーク・クイーンとして動く）",
+  whyReach: "ありうる種類（{kinds}）のどれとしても、そのマスには動けません",
+  whyCheck: "指すと盤上で最後のキング候補（{sq}）がチェックされるため、指せません",
+  whyCastle: "キングとルークの両方に確定させられないため、キャスリングできません",
+  whyGuard: "指すと自分の盤上の駒がどれもキングでありえなくなる（負けになる）ため、オプションで禁止しています",
 
   evalWin: "評価: {color}の勝ちが見えています（深さ {depth}）",
   eval: "評価: {value}（深さ {depth}）",

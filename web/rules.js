@@ -20,10 +20,11 @@ export async function loadRules(url) {
   const get = (len) => (len ? dec.decode(new Uint8Array(e.memory.buffer, e.output_ptr(), len)) : "");
   const list = (s) => (s ? s.split(" ") : []);
 
-  const STATUS = ["ongoing", "checkmate", "stalemate", "fifty", "threefold", "insufficient", "kingCaptured", "kingRevealed"];
+  const STATUS = ["ongoing", "checkmate", "stalemate", "fifty", "threefold", "insufficient", "kingCaptured", "kingRevealed", "annihilation"];
 
   return {
-    newGame: () => e.new_game(),
+    /** setup: ビット 0 = 白を通常のチェスの配置に、ビット 1 = 黒を通常のチェスの配置に (0 = 両方とも重ね合わせ) */
+    newGame: (setup = 0) => e.new_game(setup),
     /** 手 (e2e4 / 成り e7e8q / キャスリング e1g1c / アンパッサン e5d6e) を指す。成功なら表記、不正なら null */
     play: (code) => get(e.play(put(code))) || null,
     undo: () => e.undo() === 1,
@@ -43,6 +44,13 @@ export async function loadRules(url) {
       if (!s) return null;
       const [board, captured, changed, changedCaptured] = s.split("\n");
       return { board: board.split(" "), captured: list(captured), changed: list(changed).map(Number), changedCaptured: list(changedCaptured).map(Number) };
+    },
+    /** 手番側の駒を from から to (0..64) へ動かせない理由。{ kind: "own" | "reach" | "castle" | "check", sq? } か null (指せる) */
+    whyNot: (from, to) => {
+      const s = get(e.why_not(from, to));
+      if (!s) return null;
+      const [kind, sq] = s.split(" ");
+      return { kind, sq };
     },
     turn: () => (e.side_to_move() ? "b" : "w"),
     inCheck: () => e.in_check() === 1,
