@@ -465,14 +465,19 @@ async function confirmLostPawn(from, to, code) {
   const keepsPawn = rules.board()[to].slice(1).includes("p");
   rules.undo();
   if (keepsPawn) return true;
-  const ok = await askChoice(t("lostPawnTitle"), [
-    { value: "yes", text: t("lostPawnYes") },
-    { value: "no", text: t("lostPawnNo") },
-  ]);
+  const ok = await askChoice(
+    t("lostPawnTitle"),
+    [
+      { value: "yes", text: t("lostPawnYes") },
+      { value: "no", text: t("lostPawnNo") },
+    ],
+    false, // 「やめる」があるのでキャンセルボタンは出さない
+  );
   return ok === "yes";
 }
 
-function askChoice(title, options) {
+/** 選択肢のダイアログ。選んだ value (キャンセル・閉じたら null) を返す */
+function askChoice(title, options, cancelButton = true) {
   return new Promise((resolve) => {
     const dlg = $("choice");
     $("choice-title").textContent = title;
@@ -493,6 +498,13 @@ function askChoice(title, options) {
         dlg.close();
       };
       box.append(b);
+    }
+    if (cancelButton) {
+      const c = document.createElement("button");
+      c.className = "cancel";
+      c.textContent = t("cancel");
+      c.onclick = () => dlg.close();
+      box.append(c);
     }
     dlg.onclose = () => resolve(picked);
     dlg.showModal();

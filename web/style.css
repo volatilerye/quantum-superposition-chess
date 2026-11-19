@@ -289,6 +289,7 @@ dialog {
 dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
 #choice-title { white-space: pre-line; }
 .choice-buttons { display: flex; flex-direction: column; gap: 6px; }
+.choice-buttons .cancel { justify-content: center; margin-top: 6px; color: var(--muted); }
 .choice-buttons button { display: flex; align-items: center; gap: 8px; text-align: left; }
 .choice-buttons .glyph { font-size: 28px; line-height: 1; }
 
