@@ -452,27 +452,45 @@ impl Position {
                 continue;
             }
 
-            // キャスリング: 未移動のキング候補 (e1/e8) と未移動のルーク候補
-            let base = if us == WHITE { 0u8 } else { 56 };
-            if from == base + 4 && !p.moved && p.promoted == 0 && p.domain & K_ != 0 {
-                let sides: [(u8, &[u8], u8, [u8; 3]); 2] = [
-                    (base + 7, &[base + 5, base + 6], base + 6, [base + 4, base + 5, base + 6]),
-                    (base, &[base + 1, base + 2, base + 3], base + 2, [base + 4, base + 3, base + 2]),
-                ];
-                for (rook_sq, between, king_to, pass) in sides {
-                    let rook_ok = self.piece_at(rook_sq).map_or(false, |ri| {
-                        let rp = &self.pieces[ri];
-                        rp.color == us && !rp.moved && rp.promoted == 0 && rp.domain & R_ != 0
-                    });
-                    if rook_ok
-                        && between.iter().all(|&s| self.board[s as usize] == 0)
-                        && pass.iter().all(|&s| !self.attacked(s, them))
-                    {
+            // キャスリング: 同じ段にある未移動のキング候補と未移動のルーク候補で、間に 2 マス以上の空き
+            // (駒はない) があるとき。キングはルークの方へ 2 マス動き、ルークはキングがまたいだマスへ移る。
+            // キング候補のいるマス・またぐマス・行き先のマスは、相手のどの駒の (ありうる種類の) 利きもないこと
+            if !p.moved && p.promoted == 0 && p.domain & K_ != 0 {
+                for dir in [1i8, -1] {
+                    let Some((rook_sq, gap)) = self.castle_partner(from, dir) else { continue };
+                    let rp = &self.pieces[self.piece_at(rook_sq).unwrap()];
+                    if rp.color != us || rp.moved || rp.promoted != 0 || rp.domain & R_ == 0 || gap < 2 {
+                        continue;
+                    }
+                    let pass = at(f + dir, r).unwrap();
+                    let king_to = at(f + 2 * dir, r).unwrap();
+                    if [from, pass, king_to].iter().all(|&s| !self.attacked(s, them)) {
                         out.push(Move { from, to: king_to, promo: 0, special: Special::Castle, mask: K_ });
                     }
                 }
             }
         }
+    }
+
+    /// `from` から横方向 `dir` (±1) に見て最初にある駒のマスと、そこまでの空きマスの数
+    fn castle_partner(&self, from: u8, dir: i8) -> Option<(u8, u8)> {
+        let (mut f, r) = (file(from) + dir, rank(from));
+        let mut gap = 0;
+        while let Some(s) = at(f, r) {
+            if self.board[s as usize] != 0 {
+                return Some((s, gap));
+            }
+            gap += 1;
+            f += dir;
+        }
+        None
+    }
+
+    /// キャスリングでのルークの (移動元, 移動先)。ルークはキングがまたいだマスへ移る
+    pub fn castle_rook(&self, m: Move) -> (u8, u8) {
+        let dir: i8 = if m.to > m.from { 1 } else { -1 };
+        let (rf, _) = self.castle_partner(m.from, dir).expect("castling rook");
+        (rf, at(file(m.from) + dir, rank(m.from)).unwrap())
     }
 
     pub fn is_capture(&self, m: Move) -> bool {
@@ -517,7 +535,7 @@ impl Position {
         let mut changed = n.pieces[id].domain != before;
 
         if m.special == Special::Castle {
-            let (rf, rt) = if m.to > m.from { (m.from + 3, m.from + 1) } else { (m.from - 4, m.from - 1) };
+            let (rf, rt) = self.castle_rook(m);
             let r = self.piece_at(rf).expect("castling rook");
             n.board[rf as usize] = 0;
             n.board[rt as usize] = r as u8 + 1;
@@ -634,7 +652,16 @@ impl Position {
     pub fn notation(&self, m: Move) -> String {
         let n = self.apply(m);
         let mut s = match m.special {
-            Special::Castle => (if m.to > m.from { "O-O" } else { "O-O-O" }).to_string(),
+            Special::Castle => {
+                // h 側が O-O、a 側が O-O-O。通常の初期配置 (e 列のキングと隅のルーク) 以外はマスも書く
+                let mut s = (if m.to > m.from { "O-O" } else { "O-O-O" }).to_string();
+                let (rf, _) = self.castle_rook(m);
+                let home = if self.stm == WHITE { 0 } else { 7 };
+                if !(rank(m.from) == home && file(m.from) == 4 && (file(rf) == 0 || file(rf) == 7)) {
+                    s.push_str(&format!("({}-{})", sq_name(m.from), sq_name(m.to)));
+                }
+                s
+            }
             _ => {
                 let mut s = sq_name(m.from);
                 s.push(if self.is_capture(m) { 'x' } else { '-' });
@@ -936,6 +963,68 @@ mod tests {
         assert_eq!(kinds_at(&g, "f1"), "R");
     }
 
+    /// テスト用: 指定したマスの駒を「一度も動いていない」にする
+    fn unmoved(p: &mut Position, squares: &[&str]) {
+        for s in squares {
+            let id = p.piece_at(sq(s)).unwrap();
+            p.pieces[id].moved = false;
+        }
+    }
+
+    fn castles(p: &Position) -> Vec<String> {
+        p.legal_moves().iter().filter(|m| m.special == Special::Castle).map(|m| m.code()).collect()
+    }
+
+    #[test]
+    fn castling_with_any_rook_candidate_on_the_same_rank() {
+        // e1 のキング候補と b1 のルーク候補 (間に c1・d1 の 2 マス): キングは c1、ルークは d1 へ
+        let mut p = custom(&[("e1", K_ | Q_), ("b1", R_ | Q_), ("a2", P_)], &[("h8", K_)]);
+        unmoved(&mut p, &["e1", "b1"]);
+        assert_eq!(castles(&p), vec!["e1c1c"]);
+        let mut g = Game { history: vec![p], moves: vec![], notes: vec![] };
+        assert_eq!(g.play("e1c1c").as_deref(), Some("O-O-O(e1-c1)"));
+        assert_eq!(kinds_at(&g, "c1"), "K");
+        assert_eq!(kinds_at(&g, "d1"), "R");
+        assert!(g.pos().piece_at(sq("b1")).is_none() && g.pos().piece_at(sq("e1")).is_none());
+    }
+
+    #[test]
+    fn castling_on_the_second_rank() {
+        // d2 のキング候補と h2 のルーク候補: キングは f2、ルークは e2 へ
+        let mut p = custom(&[("d2", K_ | P_), ("h2", R_ | P_), ("a1", Q_)], &[("h8", K_)]);
+        unmoved(&mut p, &["d2", "h2"]);
+        assert_eq!(castles(&p), vec!["d2f2c"]);
+        let n = p.apply(p.parse_move("d2f2c").unwrap());
+        assert_eq!(n.pieces[n.piece_at(sq("f2")).unwrap()].kinds(), K_);
+        assert_eq!(n.pieces[n.piece_at(sq("e2")).unwrap()].kinds(), R_);
+    }
+
+    #[test]
+    fn castling_conditions() {
+        // 間の空きが 1 マスだけ
+        let mut p = custom(&[("e1", K_ | Q_), ("g1", R_ | Q_)], &[("h8", K_)]);
+        unmoved(&mut p, &["e1", "g1"]);
+        assert!(castles(&p).is_empty());
+        // 間に相手の駒がある
+        let mut p = custom(&[("e1", K_ | Q_), ("a1", R_ | Q_)], &[("h8", K_), ("c1", N_)]);
+        unmoved(&mut p, &["e1", "a1"]);
+        assert!(castles(&p).is_empty());
+        // ルーク候補が動いたことがある
+        let mut p = custom(&[("e1", K_ | Q_), ("h1", R_ | Q_)], &[("h8", K_)]);
+        unmoved(&mut p, &["e1"]);
+        assert!(castles(&p).is_empty());
+        // キング候補が利かされている (チェック) / またぐマスが利かされている / 行き先が利かされている
+        for (s, kind) in [("e5", R_ | Q_), ("f5", R_ | Q_), ("g5", R_)] {
+            let mut p = custom(&[("e1", K_ | Q_), ("h1", R_ | Q_)], &[("h8", K_), (s, kind)]);
+            unmoved(&mut p, &["e1", "h1"]);
+            assert!(castles(&p).is_empty(), "attacked from {s}");
+        }
+        // 利きのないマスからなら指せる
+        let mut p = custom(&[("e1", K_ | Q_), ("h1", R_ | Q_)], &[("h8", K_), ("a5", N_)]);
+        unmoved(&mut p, &["e1", "h1"]);
+        assert_eq!(castles(&p), vec!["e1g1c"]);
+    }
+
     #[test]
     fn en_passant_confirms_both_pawns() {
         let mut g = Game::default();
@@ -1114,7 +1203,7 @@ mod tests {
                     geo[id] &= m.mask;
                 }
                 if m.special == Special::Castle {
-                    let rf = if m.to > m.from { m.from + 3 } else { m.from - 4 };
+                    let (rf, _) = pos.castle_rook(m);
                     geo[pos.piece_at(rf).unwrap()] &= R_;
                 }
                 if m.special == Special::EnPassant {
@@ -1174,7 +1263,7 @@ mod tests {
                     geo[id] &= m.mask;
                 }
                 if m.special == Special::Castle {
-                    let rf = if m.to > m.from { m.from + 3 } else { m.from - 4 };
+                    let (rf, _) = pos.castle_rook(m);
                     geo[pos.piece_at(rf).unwrap()] &= R_;
                 }
                 if m.special == Special::EnPassant {

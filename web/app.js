@@ -387,7 +387,10 @@ function choiceLabel(code, all) {
   if (s === "c") return { text: t("castle") };
   if (s === "e") return { text: t("enPassant") };
   const promo = all.some((c) => "qrbn".includes(c.slice(4)) && c.length === 5);
-  return { text: t(promo ? "noPromote" : "normalMove") };
+  if (promo) return { text: t("noPromote") };
+  // キャスリングと並ぶ「横に 2 マス以上の移動」はルーク・クイーンとしての手
+  if (all.some((c) => c.slice(4) === "c")) return { text: t("castleAlt") };
+  return { text: t("normalMove") };
 }
 
 async function tryMove(from, to) {
