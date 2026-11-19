@@ -35,22 +35,49 @@ const en = {
   recordPrompt: "Game record",
 
   rules: "Rules",
-  rule1:
-    "Every piece in the starting position is a superposition of pawn, knight, bishop, rook, queen and king. (With the “Setup” option, either side can instead start from the classical chess position.)",
-  rule2:
-    "A piece moves as one of the kinds in its superposition. After the move, every kind inconsistent with that move is removed (e.g. a knight's jump collapses the piece to a knight).",
-  rule3:
-    "Each side's pieces must be assignable to the standard starting set (8 pawns, 2 knights, 2 bishops, 2 rooks, 1 queen, 1 king). Kinds that become impossible are removed even from unmoved and captured pieces.",
-  rule4:
-    "Check: when only one of your pieces on the board can still be the king, you are in check if that piece is attacked, whether or not it has been confirmed as the king (a superposed enemy piece attacks a square if any of its possible kinds does). You may not leave yourself in check or move into check. If you are in check and have no move that gets you out of it, you are checkmated and lose.",
-  rule5:
-    "If your own move leaves none of your pieces on the board able to be the king (i.e. it confirms that a captured piece was your king), you lose on that move (marked “†” in the record).",
-  rule6:
-    "Castling: possible with an unmoved king candidate and an unmoved rook candidate on the same rank, with at least two empty squares and no other pieces between them. The king candidate must not be in check, and the square it passes and its destination must not be attacked (a superposed enemy piece attacks a square if any of its possible kinds does). The king moves two squares toward the rook, and the rook moves to the square the king passed. The two pieces collapse to a king and a rook. When the move can't be told apart from a rook or queen moving sideways (e.g. e1→g1), you choose which one you mean.",
-  rule8:
-    "Annihilation: if a single move leaves neither side with any piece on the board that can be the king, the game is a draw (marked “∅” in the record).",
-  rule7:
-    "A piece that has never moved may advance two squares as a pawn from its first rank as well as its second (e.g. b1→b3 for White, b8→b6 for Black). It can be captured en passant as usual.",
+  rs_setup: "Starting position",
+  r_setup1:
+    "Every piece is a superposition of pawn, knight, bishop, rook, queen and king.",
+  r_setup2:
+    "With the “Setup” option, either side (or both) can start from the classical chess position instead.",
+  rs_super: "Moves and superposition",
+  r_super1:
+    "A piece moves as one of the kinds in its superposition.",
+  r_super2:
+    "After the move, every kind inconsistent with it is removed (e.g. a knight's jump collapses the piece to a knight).",
+  r_super3:
+    "Each side's pieces must fit the standard starting set: 8 pawns, 2 knights, 2 bishops, 2 rooks, 1 queen, 1 king (a promoted piece counts as a pawn).",
+  r_super4:
+    "Kinds that become impossible are removed even from unmoved and captured pieces.",
+  rs_check: "Check and result",
+  r_check1:
+    "Check: when only one of your pieces on the board can still be the king, you are in check if that piece is attacked (even if it isn't confirmed as the king).",
+  r_check2:
+    "A superposed enemy piece attacks a square if any of its possible kinds does.",
+  r_check3:
+    "You may not leave yourself in check or move into check. If you can't get out of check, you are checkmated and lose.",
+  r_check4:
+    "If your own move leaves none of your pieces on the board able to be the king (a captured piece turns out to have been your king), you lose on that move (“†”).",
+  r_check5:
+    "Annihilation: if a single move leaves neither side with a piece on the board that can be the king, the game is a draw (“∅”).",
+  rs_castle: "Castling",
+  r_castle1:
+    "Played with an unmoved king candidate and an unmoved rook candidate on the same rank.",
+  r_castle2:
+    "There must be no pieces and at least two empty squares between them.",
+  r_castle3:
+    "The king candidate must not be in check, and the square it passes and its destination must not be attacked.",
+  r_castle4:
+    "The king moves two squares toward the rook, and the rook moves to the square the king passed. They collapse to a king and a rook.",
+  r_castle5:
+    "If the move can't be told apart from a rook or queen moving sideways (e.g. e1→g1), you choose which one you mean.",
+  rs_pawn: "Pawn moves",
+  r_pawn1:
+    "An unmoved piece may advance two squares as a pawn from its first rank as well as its second (e.g. b1→b3 for White).",
+  r_pawn2:
+    "En passant: capturing a piece that just advanced two squares as a pawn confirms both pieces as pawns.",
+  r_pawn3:
+    "A move into the last rank as a pawn is a promotion. You can also choose to move there as a non-pawn instead.",
   hoverNote:
     "With “Show possible kinds stacked” on, hover over a piece to see its possible kinds arranged in a circle, or hold the right mouse button to see every piece that way.",
 
@@ -144,18 +171,49 @@ const ja = {
   recordPrompt: "棋譜",
 
   rules: "ルール",
-  rule1: "初期配置の駒はすべて、ポーン・ナイト・ビショップ・ルーク・クイーン・キングの重ね合わせです（「初期配置」の設定で、どちらかの色または両方を通常のチェスの配置から始めることもできます）。",
-  rule2: "駒は重ね合わせのどれか 1 種類として動きます。動いた後は、その動きと矛盾する種類が除外されます（例: ナイトの跳び方をしたらナイトに確定）。",
-  rule3:
-    "各色の駒は通常の初期配置の駒数（ポーン 8・ナイト 2・ビショップ 2・ルーク 2・クイーン 1・キング 1）に割り当てられなければならず、ありえなくなった種類は動いていない駒や取られた駒からも除外されます。",
-  rule4:
-    "チェック: 自分の盤上のキング候補が 1 枚だけになっているとき、その駒が相手の駒に利かされていればチェックです（キングに確定しているかどうかは問いません。相手の駒が重ね合わせのときは、ありうる種類のどれか 1 つでも利いていれば利かされているとみなします）。チェックを受けたままにする手や、チェックされにいく手は指せません。チェックを外す手がなければチェックメイトで負けです。",
-  rule5:
-    "自分の手で、自分の盤上の駒のどれもキングでありえなくなった場合（＝取られた駒がキングだったと確定した場合）は、その手を指した時点で負けです（棋譜では「†」）。",
-  rule6:
-    "キャスリング: 同じ段にある、一度も動いていないキング候補の駒とルーク候補の駒で指せます。間に 2 マス以上の空きがあり、敵味方どちらの駒も置かれていないことが条件です。また、キング候補がチェックされておらず、またぐマスと行き先のマスのどちらも相手の駒に利かされていない必要があります（相手の駒が重ね合わせのときは、ありうる種類のどれか 1 つでも利いていれば利かされているとみなします）。キングはルークの方へ 2 マス動き、ルークはキングがまたいだマスへ移ります。指すと、動いた 2 枚はそれぞれキングとルークに確定します。e1→g1 のようにルーク・クイーンとしての横移動と区別できない場合は、どちらとして指すかを選べます。",
-  rule8: "対消滅: 1 手で両者とも盤上の駒のどれもキングでありえなくなった場合は引き分けです（棋譜では「∅」）。",
-  rule7: "一度も動いていない駒は、2 段目だけでなく 1 段目からもポーンとして 2 マス前進できます（白なら b1→b3、黒なら b8→b6 など）。通常どおりアンパッサンで取られることがあります。",
+  rs_setup: "初期配置",
+  r_setup1:
+    "すべての駒が、ポーン・ナイト・ビショップ・ルーク・クイーン・キングの重ね合わせです。",
+  r_setup2:
+    "「初期配置」の設定で、どちらかの色（または両方）を通常のチェスの配置から始めることもできます。",
+  rs_super: "動きと重ね合わせ",
+  r_super1:
+    "駒は、重ね合わせのうちどれか 1 種類として動きます。",
+  r_super2:
+    "動いた後は、その動きと矛盾する種類が除外されます（例: ナイトの跳び方をしたらナイトに確定）。",
+  r_super3:
+    "各色の駒は、通常の駒数（ポーン 8・ナイト 2・ビショップ 2・ルーク 2・クイーン 1・キング 1）に割り当てられなければなりません（成った駒はポーンとして数えます）。",
+  r_super4:
+    "ありえなくなった種類は、動いていない駒や取られた駒からも除外されます。",
+  rs_check: "チェックと勝敗",
+  r_check1:
+    "チェック: 自分の盤上のキング候補が 1 枚だけのとき、その駒が利かされていればチェックです（キングに確定していなくても）。",
+  r_check2:
+    "相手の駒が重ね合わせのときは、ありうる種類のどれか 1 つでも利いていれば、利かされているとみなします。",
+  r_check3:
+    "チェックを受けたままにする手や、チェックされにいく手は指せません。チェックを外せなければチェックメイトで負けです。",
+  r_check4:
+    "自分の手で、自分の盤上の駒のどれもキングでありえなくなったら（＝取られた駒がキングだったと確定したら）、その手を指した時点で負けです（「†」）。",
+  r_check5:
+    "対消滅: 1 手で両者とも盤上の駒のどれもキングでありえなくなったら、引き分けです（「∅」）。",
+  rs_castle: "キャスリング",
+  r_castle1:
+    "同じ段にある、一度も動いていないキング候補の駒とルーク候補の駒で指せます。",
+  r_castle2:
+    "間に駒がなく、2 マス以上空いている必要があります。",
+  r_castle3:
+    "キング候補がチェックされておらず、またぐマスと行き先のマスが利かされていないことが条件です。",
+  r_castle4:
+    "キングはルークの方へ 2 マス動き、ルークはキングがまたいだマスへ移ります。2 枚はそれぞれキングとルークに確定します。",
+  r_castle5:
+    "e1→g1 のようにルーク・クイーンとしての横移動と区別できない場合は、どちらとして指すかを選べます。",
+  rs_pawn: "ポーンとしての動き",
+  r_pawn1:
+    "一度も動いていない駒は、2 段目だけでなく 1 段目からもポーンとして 2 マス前進できます（白なら b1→b3 など）。",
+  r_pawn2:
+    "アンパッサン: 直前にポーンとして 2 マス進んだ駒を取れます。取った駒・取られた駒ともポーンに確定します。",
+  r_pawn3:
+    "ポーンとして最終段に入る手は成りです。同じマスへ「ポーン以外として動く」手と選べます。",
   hoverNote: "「半透明で重ねて表示」を ON にしているときは、駒にマウスを乗せると、ありうる種類を円形に並べて表示します。右クリックを押している間は、全部の駒をそう表示します。",
 
   white: "白",
