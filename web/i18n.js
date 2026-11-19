@@ -31,7 +31,7 @@ const en = {
     " — connection unstable, waiting for your opponent…",
   onlineTitle: "Online game",
   onlineIntro:
-    "Your browsers connect to each other directly, with no game server in between. (A public STUN server is used only to find your network address. Some networks may block the connection.)",
+    "Your browsers connect to each other directly, with no game server in between. (Google's public STUN server is used only to find your network address. Some networks may block the connection.)",
   hostStep1:
     "Create an invite link and send it to your opponent (by chat, e-mail, etc.).",
   makeInvite:
@@ -46,6 +46,7 @@ const en = {
     "Then come back to this page right away and keep it open. On a phone, the connection pauses while the browser is in the background.",
   netWorking: "Preparing…",
   netWaiting: "Waiting for the connection…",
+  netTimeout: "Gave up after 10 minutes without connecting. Please create a new invite link.",
   netConnected: "Connected!",
   netClosed: "The connection to your opponent was closed",
   netFailed: "Could not connect: {msg}",
@@ -212,7 +213,7 @@ const ja = {
     " — 接続が不安定です（相手を待っています…）",
   onlineTitle: "オンライン対戦",
   onlineIntro:
-    "お互いのブラウザを、ゲーム用のサーバーを通さずに直接つなぎます（自分のネットワーク上の住所を調べるためだけに公開の STUN サーバーを使います。ネットワークによってはつながらないことがあります）。",
+    "お互いのブラウザを、ゲーム用のサーバーを通さずに直接つなぎます（自分のネットワーク上の住所を調べるためだけに Google の公開 STUN サーバーを使います。ネットワークによってはつながらないことがあります）。",
   hostStep1:
     "招待リンクを作って、チャットやメールなどで相手に送ります。",
   makeInvite:
@@ -227,6 +228,7 @@ const ja = {
     "送ったらすぐにこのページに戻って、開いたままにしてください（スマホではブラウザが裏にあるあいだ通信が止まります）。",
   netWorking: "準備中…",
   netWaiting: "接続を待っています…",
+  netTimeout: "10 分待ってもつながらなかったので、接続をやめました。招待リンクを作り直してください。",
   netConnected: "接続しました！",
   netClosed: "相手との接続が切れました",
   netFailed: "接続できませんでした: {msg}",

@@ -767,6 +767,8 @@ function newLink(role) {
       $("opponent").value = "online";
       updateSettingsUI();
       if (role === "host") newGame();
+    } else if (st === "timeout") {
+      onlineStatus("netTimeout");
     } else if (st === "unstable" || st === "stable") {
       // 相手のブラウザが裏に回ったときなど。相手が戻れば自動で直る
       state.netUnstable = st === "unstable";
@@ -855,7 +857,7 @@ async function joinFromLink(code) {
   try {
     state.replyUrl = pageUrl() + "#reply=" + (await newLink("guest").joinWithInvite(code));
     $("reply-actions").hidden = false;
-    onlineStatus(null);
+    onlineStatus("netWaiting");
   } catch {
     onlineStatus("badLink");
   }
