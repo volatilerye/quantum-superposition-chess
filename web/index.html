@@ -29,8 +29,9 @@
         <div class="row">
           <label><span data-i18n="opponent">Opponent</span>
             <select id="opponent">
-              <option value="engine" data-i18n="optEngine">Engine</option>
-              <option value="human" data-i18n="optHuman">Human (same screen, taking turns)</option>
+              <option value="engine" data-i18n="optEngine">vs CPU</option>
+              <option value="human" data-i18n="optHuman">Free play</option>
+              <option value="online" data-i18n="optOnline">vs Human (online)</option>
             </select>
           </label>
         </div>
@@ -57,7 +58,7 @@
       </fieldset>
 
       <fieldset>
-        <legend data-i18n="engine">Engine</legend>
+        <legend data-i18n="engine">CPU</legend>
         <label class="inline"><span data-i18n="strength">Strength</span>
           <select id="level">
             <option value="1" data-i18n="levelOpt" data-n="1">Level 1</option>
@@ -147,6 +148,45 @@
           <p class="muted" data-i18n="hoverNote"></p>
     </div>
     <div class="rules-actions"><button id="close-rules" class="primary" data-i18n="close">Close</button></div>
+  </dialog>
+
+  <dialog id="online-dialog" class="online-dialog">
+    <h2 data-i18n="onlineTitle">Online game</h2>
+    <p class="muted small" data-i18n="onlineIntro"></p>
+    <div class="online-tabs">
+      <button id="tab-host" data-i18n="tabHost">Invite</button>
+      <button id="tab-guest" data-i18n="tabGuest">Join</button>
+    </div>
+    <ol id="online-host" class="online-steps">
+      <li>
+        <span data-i18n="hostStep1"></span>
+        <div class="row"><button id="make-invite" class="primary" data-i18n="makeInvite">Create invite code</button></div>
+        <textarea id="invite-code" rows="3" readonly></textarea>
+        <div class="row">
+          <button id="copy-invite" data-i18n="copyCode">Copy code</button>
+          <button id="copy-invite-url" data-i18n="copyLink">Copy invite link</button>
+        </div>
+      </li>
+      <li>
+        <span data-i18n="hostStep2"></span>
+        <textarea id="reply-in" rows="3"></textarea>
+        <div class="row"><button id="connect" class="primary" data-i18n="connect">Connect</button></div>
+      </li>
+    </ol>
+    <ol id="online-guest" class="online-steps" hidden>
+      <li>
+        <span data-i18n="guestStep1"></span>
+        <textarea id="invite-in" rows="3"></textarea>
+        <div class="row"><button id="make-reply" class="primary" data-i18n="makeReply">Create reply code</button></div>
+      </li>
+      <li>
+        <span data-i18n="guestStep2"></span>
+        <textarea id="reply-code" rows="3" readonly></textarea>
+        <div class="row"><button id="copy-reply" data-i18n="copyCode">Copy code</button></div>
+      </li>
+    </ol>
+    <p id="online-status" class="small online-status"></p>
+    <div class="rules-actions"><button id="close-online" data-i18n="close">Close</button></div>
   </dialog>
 
   <dialog id="choice">

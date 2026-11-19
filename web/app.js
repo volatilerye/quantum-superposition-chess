@@ -1,5 +1,6 @@
 import { loadRules } from "./rules.js";
 import { Engine } from "./engine.js";
+import { Link } from "./online.js";
 import { t, setLang, applyStatic, DEFAULT_LANG } from "./i18n.js";
 
 const WASM_URL = "pkg/chess_core.wasm";
@@ -23,7 +24,9 @@ const statusEl = $("status");
 const state = {
   rules: null,
   engine: null,
-  opponent: "engine", // "engine" | "human"
+  opponent: "engine", // "engine" | "human" | "online"
+  link: null, // オンライン対戦の接続 (online.js の Link)
+  role: null, // オンライン対戦で "host" (招待した側) | "guest" (招待された側)
   setup: 0, // 初期配置 (ビット 0 = 白を通常のチェスの配置に、ビット 1 = 黒を通常のチェスの配置に)
   player: "w", // エンジン対局でのこちらの色
   flipped: false,
@@ -69,7 +72,8 @@ function saveSettings() {
 }
 
 function updateSettingsUI() {
-  $("color-box").hidden = $("opponent").value !== "engine";
+  // 手番はエンジン対局と、オンライン対戦で招待する側が選ぶ
+  $("color-box").hidden = !["engine", "online"].includes($("opponent").value);
   saveSettings();
 }
 
@@ -349,7 +353,7 @@ function setStatus(main, thinking = false) {
 
 function renderStaging() {
   setStatus(t("staging"), true);
-  $("undo").disabled = false;
+  $("undo").disabled = onlineGame();
 }
 
 /**
@@ -387,16 +391,27 @@ function renderStatus() {
     setStatus(t("thinking"), true);
   } else if (engineTurn()) {
     setStatus(t("engineLoading"));
+  } else if (onlineGame() && !connected()) {
+    setStatus(t("notConnected"));
+  } else if (remoteTurn()) {
+    setStatus(t("opponentTurn", { color: colorName(turn) }) + (rules.inCheck() ? t("check") : ""));
   } else {
-    const key = state.opponent === "engine" ? "toMoveYou" : "toMove";
+    const key = state.opponent === "human" ? "toMove" : "toMoveYou";
     setStatus(t(key, { color: colorName(turn) }) + (rules.inCheck() ? t("check") : ""));
   }
-  $("undo").disabled = rules.history().length === 0;
+  $("undo").disabled = rules.history().length === 0 || onlineGame();
+  $("new-game").disabled = onlineGame() && connected() && state.role === "guest";
+  $("new-game").title = $("new-game").disabled ? t("hostOnly") : "";
 }
 
 // ---- 入力 ---------------------------------------------------------------
+const onlineGame = () => state.opponent === "online";
+const connected = () => !!state.link?.connected;
+/** オンライン対戦で、相手の手番か未接続なら true */
+const remoteTurn = () => onlineGame() && (!connected() || state.rules.turn() !== state.player);
+
 function canMove() {
-  return !state.thinking && !state.animating && state.rules.status() === "ongoing" && !engineTurn();
+  return !state.thinking && !state.animating && state.rules.status() === "ongoing" && !engineTurn() && !remoteTurn();
 }
 
 function ownPiece(sq) {
@@ -429,6 +444,7 @@ async function tryMove(from, to) {
   if (!(await confirmLostPawn(from, to, code))) return false;
   state.selected = null;
   if (!state.rules.play(code)) return false;
+  if (onlineGame()) state.link.send({ type: "move", code, ply: state.rules.history().length - 1 });
   if (await showLastMove()) maybeEngineMove();
   return true;
 }
@@ -691,8 +707,146 @@ async function analyze() {
   }
 }
 
+// ---- オンライン対戦 -------------------------------------------------------
+const resolveColor = () => {
+  const c = $("color").value;
+  return c === "r" ? (Math.random() < 0.5 ? "w" : "b") : c;
+};
+
+/** オンライン対戦の対局を始める (自分の色 player、初期配置 setup) */
+function startGame(setup, player) {
+  cancelEngine();
+  state.opponent = "online";
+  state.player = player;
+  state.flipped = player === "b";
+  state.selected = null;
+  state.inspect = null;
+  state.error = null;
+  state.setup = setup;
+  state.rules.newGame(setup);
+  render();
+  saveSettings();
+}
+
+function onlineStatus(key, vars) {
+  $("online-status").textContent = key ? t(key, vars) : "";
+}
+
+function newLink(role) {
+  state.link?.close();
+  state.role = role;
+  state.link = new Link(onRemoteMessage, (st) => {
+    if (st === "open") {
+      onlineStatus("netConnected");
+      $("online-dialog").close();
+      $("opponent").value = "online";
+      updateSettingsUI();
+      if (role === "host") newGame();
+    } else {
+      onlineStatus("netClosed");
+      state.error = state.opponent === "online" ? { key: "netClosed" } : state.error;
+      if (state.rules) render();
+    }
+  });
+  return state.link;
+}
+
+async function onRemoteMessage(msg) {
+  const { rules } = state;
+  if (msg.type === "start" && state.role === "guest") {
+    $("setup").value = String(msg.setup);
+    startGame(Number(msg.setup), msg.hostColor === "w" ? "b" : "w");
+  } else if (msg.type === "move" && onlineGame()) {
+    if (msg.ply !== rules.history().length || rules.turn() === state.player || !rules.play(msg.code)) {
+      state.error = { key: "errSync", vars: { move: msg.code } };
+      render();
+      return;
+    }
+    state.selected = null;
+    await showLastMove();
+  } else if (msg.type === "bye") {
+    state.link?.close();
+    state.error = { key: "netClosed" };
+    render();
+  }
+}
+
+function openOnline(tab = "host") {
+  showOnlineTab(tab);
+  onlineStatus(null);
+  $("online-dialog").showModal();
+}
+
+function showOnlineTab(tab) {
+  $("online-host").hidden = tab !== "host";
+  $("online-guest").hidden = tab !== "guest";
+  $("tab-host").classList.toggle("active", tab === "host");
+  $("tab-guest").classList.toggle("active", tab === "guest");
+}
+
+async function copyText(text, button) {
+  try {
+    await navigator.clipboard.writeText(text);
+    const label = button.textContent;
+    button.textContent = t("copied");
+    setTimeout(() => (button.textContent = label), 1500);
+  } catch {
+    prompt("", text);
+  }
+}
+
+$("tab-host").onclick = () => showOnlineTab("host");
+$("tab-guest").onclick = () => showOnlineTab("guest");
+$("close-online").onclick = () => $("online-dialog").close();
+$("make-invite").onclick = async () => {
+  onlineStatus("netWorking");
+  try {
+    $("invite-code").value = await newLink("host").createInvite();
+    onlineStatus(null);
+  } catch (e) {
+    onlineStatus("netFailed", { msg: e.message });
+  }
+};
+$("copy-invite").onclick = (ev) => copyText($("invite-code").value, ev.target);
+$("copy-invite-url").onclick = (ev) => {
+  const url = location.href.split("#")[0] + "#join=" + $("invite-code").value;
+  copyText(url, ev.target);
+};
+$("connect").onclick = async () => {
+  try {
+    await state.link.acceptReply($("reply-in").value);
+    onlineStatus("netWaiting");
+  } catch (e) {
+    onlineStatus("badCode");
+  }
+};
+$("make-reply").onclick = async () => {
+  onlineStatus("netWorking");
+  try {
+    $("reply-code").value = await newLink("guest").joinWithInvite($("invite-in").value);
+    onlineStatus("netWaiting");
+  } catch (e) {
+    onlineStatus("badCode");
+  }
+};
+$("copy-reply").onclick = (ev) => copyText($("reply-code").value, ev.target);
+for (const id of ["invite-code", "reply-code"]) $(id).addEventListener("focus", (ev) => ev.target.select());
+
 // ---- ボタン -------------------------------------------------------------
 function newGame() {
+  if ($("opponent").value === "online") {
+    // 未接続なら接続のダイアログを開く。接続済みなら招待した側だけが新しい対局を始める
+    if (!connected()) return openOnline();
+    if (state.role !== "host") return;
+    startGame(Number($("setup").value), resolveColor());
+    state.link.send({ type: "start", setup: state.setup, hostColor: state.player });
+    return;
+  }
+  if (state.link) {
+    state.link.send({ type: "bye" });
+    state.link.close();
+    state.link = null;
+  }
   cancelEngine();
   state.opponent = $("opponent").value;
   const c = $("color").value;
@@ -710,7 +864,7 @@ function newGame() {
 
 function undo() {
   const { rules } = state;
-  if (rules.history().length === 0) return;
+  if (rules.history().length === 0 || onlineGame()) return;
   cancelEngine();
   if (state.opponent === "human") {
     rules.undo();
@@ -736,7 +890,8 @@ function kifu() {
   else if (st !== "ongoing") result = "1/2-1/2";
   const d = new Date();
   const date = `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
-  const name = (c) => (state.opponent === "human" ? (c === "w" ? "White" : "Black") : c === state.player ? "You" : "Engine");
+  const other = onlineGame() ? "Opponent" : "CPU";
+  const name = (c) => (state.opponent === "human" ? (c === "w" ? "White" : "Black") : c === state.player ? "You" : other);
   const headers = [
     `[Event "Casual game"]`,
     `[Variant "Quantum superposition chess"]`,
@@ -815,4 +970,15 @@ async function main() {
   maybeEngineMove();
 }
 
-main();
+/** 招待リンク (#join=コード) で開かれたら、オンライン対戦の「招待された」画面を出す */
+function openInviteLink() {
+  const m = location.hash.match(/^#join=(.+)$/);
+  if (!m) return;
+  history.replaceState(null, "", location.href.split("#")[0]);
+  $("opponent").value = "online";
+  updateSettingsUI();
+  $("invite-in").value = decodeURIComponent(m[1]);
+  openOnline("guest");
+}
+
+main().then(openInviteLink);

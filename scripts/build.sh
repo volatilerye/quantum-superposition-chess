@@ -22,7 +22,7 @@ cp target/wasm32-unknown-unknown/release/chess_core.wasm "$DIST/pkg/"
 VER="$(cat web/* "$DIST/pkg/chess_core.wasm" | sha1sum | cut -c1-10)"
 sed -i "s|\"app.js\"|\"app.js?v=$VER\"|; s|\"style.css\"|\"style.css?v=$VER\"|" "$DIST/index.html"
 for f in app.js engine-worker.js; do
-  sed -i -E "s#\"(\./)?(rules|engine|engine-worker|i18n)\.js\"#\"\1\2.js?v=$VER\"#g; s#\"pkg/chess_core\.wasm\"#\"pkg/chess_core.wasm?v=$VER\"#" "$DIST/$f"
+  sed -i -E "s#\"(\./)?(rules|engine|engine-worker|i18n|online)\.js\"#\"\1\2.js?v=$VER\"#g; s#\"pkg/chess_core\.wasm\"#\"pkg/chess_core.wasm?v=$VER\"#" "$DIST/$f"
 done
 
 touch "$DIST/.nojekyll"
