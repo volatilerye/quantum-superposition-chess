@@ -153,37 +153,26 @@
   <dialog id="online-dialog" class="online-dialog">
     <h2 data-i18n="onlineTitle">Online game</h2>
     <p class="muted small" data-i18n="onlineIntro"></p>
-    <div class="online-tabs">
-      <button id="tab-host" data-i18n="tabHost">Invite</button>
-      <button id="tab-guest" data-i18n="tabGuest">Join</button>
-    </div>
     <ol id="online-host" class="online-steps">
       <li>
         <span data-i18n="hostStep1"></span>
-        <div class="row"><button id="make-invite" class="primary" data-i18n="makeInvite">Create invite code</button></div>
-        <textarea id="invite-code" rows="3" readonly></textarea>
-        <div class="row">
-          <button id="copy-invite" data-i18n="copyCode">Copy code</button>
-          <button id="copy-invite-url" data-i18n="copyLink">Copy invite link</button>
+        <div class="row"><button id="make-invite" class="primary" data-i18n="makeInvite">Create invite link</button></div>
+        <div id="invite-actions" class="row" hidden>
+          <button id="copy-invite" data-i18n="copyLink">Copy invite link</button>
+          <button id="share-invite" class="share" data-i18n="share">Share…</button>
         </div>
       </li>
-      <li>
-        <span data-i18n="hostStep2"></span>
-        <textarea id="reply-in" rows="3"></textarea>
-        <div class="row"><button id="connect" class="primary" data-i18n="connect">Connect</button></div>
-      </li>
+      <li><span data-i18n="hostStep2"></span></li>
     </ol>
     <ol id="online-guest" class="online-steps" hidden>
       <li>
         <span data-i18n="guestStep1"></span>
-        <textarea id="invite-in" rows="3"></textarea>
-        <div class="row"><button id="make-reply" class="primary" data-i18n="makeReply">Create reply code</button></div>
+        <div id="reply-actions" class="row" hidden>
+          <button id="copy-reply" class="primary" data-i18n="copyReply">Copy reply link</button>
+          <button id="share-reply" class="share" data-i18n="share">Share…</button>
+        </div>
       </li>
-      <li>
-        <span data-i18n="guestStep2"></span>
-        <textarea id="reply-code" rows="3" readonly></textarea>
-        <div class="row"><button id="copy-reply" data-i18n="copyCode">Copy code</button></div>
-      </li>
+      <li><span data-i18n="guestStep2"></span></li>
     </ol>
     <p id="online-status" class="small online-status"></p>
     <div class="rules-actions"><button id="close-online" data-i18n="close">Close</button></div>

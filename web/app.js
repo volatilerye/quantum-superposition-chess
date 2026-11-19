@@ -1,6 +1,6 @@
 import { loadRules } from "./rules.js";
 import { Engine } from "./engine.js";
-import { Link } from "./online.js";
+import { Link, inviteIdOf } from "./online.js";
 import { t, setLang, applyStatic, DEFAULT_LANG } from "./i18n.js";
 
 const WASM_URL = "pkg/chess_core.wasm";
@@ -27,6 +27,9 @@ const state = {
   opponent: "engine", // "engine" | "human" | "online"
   link: null, // オンライン対戦の接続 (online.js の Link)
   role: null, // オンライン対戦で "host" (招待した側) | "guest" (招待された側)
+  netUnstable: false, // オンライン対戦の接続が一時的に不安定 (相手のブラウザが裏に回ったときなど)
+  inviteUrl: "", // 作った招待リンク
+  replyUrl: "", // 作った返信リンク
   setup: 0, // 初期配置 (ビット 0 = 白を通常のチェスの配置に、ビット 1 = 黒を通常のチェスの配置に)
   player: "w", // エンジン対局でのこちらの色
   flipped: false,
@@ -347,6 +350,7 @@ function setStatus(main, thinking = false) {
   const piece = looked ? (looked.captured ? t("captured", { desc: describe(looked.tok) }) : describe(looked.tok)) : "";
   const after = state.rules && !state.error && !thinking ? afterMove() : [];
   const why = state.rules && !state.error && !thinking && !after.length ? whyNotHere() : "";
+  if (onlineGame() && state.netUnstable && !state.error) main += t("netUnstable");
   statusEl.classList.toggle("thinking", thinking);
   statusEl.replaceChildren(line("st-main", main));
   if (piece) statusEl.append(line("st-piece", piece));
@@ -750,9 +754,12 @@ function onlineStatus(key, vars) {
   $("online-status").textContent = key ? t(key, vars) : "";
 }
 
+const pageUrl = () => location.href.split("#")[0];
+
 function newLink(role) {
   state.link?.close();
   state.role = role;
+  state.netUnstable = false;
   state.link = new Link(onRemoteMessage, (st) => {
     if (st === "open") {
       onlineStatus("netConnected");
@@ -760,8 +767,13 @@ function newLink(role) {
       $("opponent").value = "online";
       updateSettingsUI();
       if (role === "host") newGame();
+    } else if (st === "unstable" || st === "stable") {
+      // 相手のブラウザが裏に回ったときなど。相手が戻れば自動で直る
+      state.netUnstable = st === "unstable";
+      if (state.rules && !state.animating) renderStatus();
     } else {
       onlineStatus("netClosed");
+      state.netUnstable = false;
       state.error = state.opponent === "online" ? { key: "netClosed" } : state.error;
       if (state.rules) render();
     }
@@ -789,17 +801,12 @@ async function onRemoteMessage(msg) {
   }
 }
 
-function openOnline(tab = "host") {
-  showOnlineTab(tab);
+/** 接続のダイアログ。mode: "host" (招待する) / "guest" (招待リンクから開いた) / "relay" (返信リンクを受け渡すだけ) */
+function openOnline(mode = "host") {
+  $("online-host").hidden = mode !== "host";
+  $("online-guest").hidden = mode !== "guest";
   onlineStatus(null);
-  $("online-dialog").showModal();
-}
-
-function showOnlineTab(tab) {
-  $("online-host").hidden = tab !== "host";
-  $("online-guest").hidden = tab !== "guest";
-  $("tab-host").classList.toggle("active", tab === "host");
-  $("tab-guest").classList.toggle("active", tab === "guest");
+  if (!$("online-dialog").open) $("online-dialog").showModal();
 }
 
 async function copyText(text, button) {
@@ -813,42 +820,103 @@ async function copyText(text, button) {
   }
 }
 
-$("tab-host").onclick = () => showOnlineTab("host");
-$("tab-guest").onclick = () => showOnlineTab("guest");
+/** OS の共有メニュー (スマホなら LINE などに直接送れる)。使えないブラウザではボタンを出さない */
+async function shareUrl(url) {
+  try {
+    await navigator.share({ title: t("pageTitle"), url });
+  } catch {}
+}
+for (const id of ["share-invite", "share-reply"]) $(id).hidden = !navigator.share;
+
 $("close-online").onclick = () => $("online-dialog").close();
 $("make-invite").onclick = async () => {
   onlineStatus("netWorking");
+  $("invite-actions").hidden = true;
   try {
-    $("invite-code").value = await newLink("host").createInvite();
-    onlineStatus(null);
+    state.inviteUrl = pageUrl() + "#join=" + (await newLink("host").createInvite());
+    $("invite-actions").hidden = false;
+    onlineStatus("inviteReady");
   } catch (e) {
     onlineStatus("netFailed", { msg: e.message });
   }
 };
-$("copy-invite").onclick = (ev) => copyText($("invite-code").value, ev.target);
-$("copy-invite-url").onclick = (ev) => {
-  const url = location.href.split("#")[0] + "#join=" + $("invite-code").value;
-  copyText(url, ev.target);
-};
-$("connect").onclick = async () => {
-  try {
-    await state.link.acceptReply($("reply-in").value);
-    onlineStatus("netWaiting");
-  } catch (e) {
-    onlineStatus("badCode");
-  }
-};
-$("make-reply").onclick = async () => {
+$("copy-invite").onclick = (ev) => copyText(state.inviteUrl, ev.target);
+$("share-invite").onclick = () => shareUrl(state.inviteUrl);
+$("copy-reply").onclick = (ev) => copyText(state.replyUrl, ev.target);
+$("share-reply").onclick = () => shareUrl(state.replyUrl);
+
+/** 招待リンク (#join=…) から開いたとき: 返信リンクを作る */
+async function joinFromLink(code) {
+  $("opponent").value = "online";
+  updateSettingsUI();
+  openOnline("guest");
+  $("reply-actions").hidden = true;
   onlineStatus("netWorking");
   try {
-    $("reply-code").value = await newLink("guest").joinWithInvite($("invite-in").value);
-    onlineStatus("netWaiting");
-  } catch (e) {
-    onlineStatus("badCode");
+    state.replyUrl = pageUrl() + "#reply=" + (await newLink("guest").joinWithInvite(code));
+    $("reply-actions").hidden = false;
+    onlineStatus(null);
+  } catch {
+    onlineStatus("badLink");
   }
-};
-$("copy-reply").onclick = (ev) => copyText($("reply-code").value, ev.target);
-for (const id of ["invite-code", "reply-code"]) $(id).addEventListener("focus", (ev) => ev.target.select());
+}
+
+// 返信リンクは新しいタブで開かれることが多いので、同じブラウザの「招待を作ったタブ」へ受け渡す
+const channel = "BroadcastChannel" in window ? new BroadcastChannel("qchess-online") : null;
+
+async function useReply(code) {
+  openOnline("host");
+  try {
+    await state.link.acceptReply(code);
+    onlineStatus("netWaiting");
+  } catch {
+    onlineStatus("badLink");
+  }
+}
+
+const waitingForReply = (id) => state.role === "host" && state.link && !connected() && state.link.id === id;
+
+channel?.addEventListener("message", async (ev) => {
+  const m = ev.data;
+  if (m?.type === "reply" && waitingForReply(m.id)) {
+    channel.postMessage({ type: "ack", nonce: m.nonce });
+    await useReply(m.code);
+  }
+});
+
+/** 返信リンク (#reply=…) から開いたとき */
+async function replyFromLink(code) {
+  const id = await inviteIdOf(code);
+  if (waitingForReply(id)) return useReply(code); // このタブで作った招待への返信
+  openOnline("relay");
+  onlineStatus("relaying");
+  const nonce = Math.random();
+  const acked = await new Promise((resolve) => {
+    if (!channel || !id) return resolve(false);
+    const timer = setTimeout(() => resolve(false), 2000);
+    channel.addEventListener("message", function onAck(ev) {
+      if (ev.data?.type === "ack" && ev.data.nonce === nonce) {
+        clearTimeout(timer);
+        channel.removeEventListener("message", onAck);
+        resolve(true);
+      }
+    });
+    channel.postMessage({ type: "reply", id, code, nonce });
+  });
+  onlineStatus(acked ? "relayDone" : "relayNoTab");
+  if (acked) setTimeout(() => window.close(), 500); // 開けた場合だけ閉じられる
+}
+
+/** URL の #join= / #reply= を処理する (処理したら URL から消す) */
+function handleLinkHash() {
+  const m = location.hash.match(/^#(join|reply)=(.+)$/);
+  if (!m) return;
+  history.replaceState(null, "", pageUrl());
+  const code = decodeURIComponent(m[2]);
+  if (m[1] === "join") joinFromLink(code);
+  else replyFromLink(code);
+}
+window.addEventListener("hashchange", handleLinkHash);
 
 // ---- ボタン -------------------------------------------------------------
 function newGame() {
@@ -988,15 +1056,4 @@ async function main() {
   maybeEngineMove();
 }
 
-/** 招待リンク (#join=コード) で開かれたら、オンライン対戦の「招待された」画面を出す */
-function openInviteLink() {
-  const m = location.hash.match(/^#join=(.+)$/);
-  if (!m) return;
-  history.replaceState(null, "", location.href.split("#")[0]);
-  $("opponent").value = "online";
-  updateSettingsUI();
-  $("invite-in").value = decodeURIComponent(m[1]);
-  openOnline("guest");
-}
-
-main().then(openInviteLink);
+main().then(handleLinkHash);

@@ -314,21 +314,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
 .online-dialog { width: min(560px, calc(100vw - 32px)); padding: 14px 16px; }
 .online-dialog h2 { font-size: 1.05rem; margin: 0 0 6px; }
 .online-dialog p { margin: 0 0 10px; }
-.online-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
-.online-tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .online-steps { margin: 0; padding-left: 1.3em; }
 .online-steps li { margin-bottom: 12px; }
 .online-steps .row { margin-top: 6px; }
-.online-steps textarea {
-  display: block;
-  width: 100%;
-  margin-top: 6px;
-  font: 0.75rem ui-monospace, Menlo, Consolas, monospace;
-  color: var(--text);
-  background: #23262a;
-  border: 1px solid #4a4f56;
-  border-radius: 5px;
-  resize: vertical;
-  word-break: break-all;
-}
 .online-status { min-height: 1.2em; color: var(--accent); }

@@ -1,5 +1,5 @@
 // オンライン対戦: 2 つのブラウザを WebRTC のデータチャネルで直接つなぐ。
-// 仲介サーバーを使わず、接続情報 (SDP) を「招待コード」「返信コード」として手でやり取りする。
+// 仲介サーバーを使わず、接続情報 (SDP) を「招待リンク」「返信リンク」に入れてやり取りする。
 // インターネット越しにつなぐため、自分の外向きアドレスを調べる公開 STUN サーバーだけは使う
 // (STUN には接続情報しか送らず、手の内容はブラウザ同士で直接やり取りする)。
 
@@ -39,10 +39,22 @@ function waitIce(pc) {
   });
 }
 
+/** 招待・返信コードに入っている招待の id (読めなければ null) */
+export async function inviteIdOf(code) {
+  try {
+    return (await decode(code)).id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * 相手との接続。onMessage(obj) で受信したメッセージ、onState("open" | "closed") で接続状態を受け取る。
+ * 相手との接続。onMessage(obj) で受信したメッセージ、onState(st) で接続状態を受け取る:
+ * "open" (つながった) / "unstable" (一時的に通信できない。相手のブラウザが裏に回った等) /
+ * "stable" (不安定から戻った) / "closed" (切れた。もう戻らない)
  * 招待する側: createInvite() → (相手の返信コードで) acceptReply(code)
  * 招待された側: joinWithInvite(code) → 返信コードを相手に送る
+ * 招待コードには招待ごとの id が入り、返信コードにも同じ id が入る (inviteIdOf で取り出せる)
  */
 export class Link {
   constructor(onMessage, onState) {
@@ -61,7 +73,11 @@ export class Link {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     pc.addEventListener("connectionstatechange", () => {
       if (pc !== this.pc) return;
-      if (pc.connectionState === "failed" || pc.connectionState === "closed") this.onState("closed");
+      const st = pc.connectionState;
+      // "disconnected" は一時的なもので、相手が戻れば自動で "connected" に戻る
+      if (st === "disconnected" && this.connected) this.onState("unstable");
+      else if (st === "connected" && this.connected) this.onState("stable");
+      else if (st === "failed" || st === "closed") this.onState("closed");
     });
     this.pc = pc;
     return pc;
@@ -82,16 +98,18 @@ export class Link {
 
   async createInvite() {
     const pc = this.#newPeer();
+    this.id = Math.random().toString(36).slice(2, 10);
     this.#bind(pc.createDataChannel("qchess"));
     await pc.setLocalDescription(await pc.createOffer());
     await waitIce(pc);
-    return encode({ app: "qchess", kind: "invite", sdp: pc.localDescription.sdp });
+    return encode({ app: "qchess", kind: "invite", id: this.id, sdp: pc.localDescription.sdp });
   }
 
   async acceptReply(code) {
     const msg = await decode(code);
     if (msg.app !== "qchess" || msg.kind !== "reply") throw new Error("not a reply code");
-    if (!this.pc) throw new Error("create an invite code first");
+    if (!this.pc) throw new Error("create an invite first");
+    if (msg.id !== this.id) throw new Error("this reply is for another invite");
     await this.pc.setRemoteDescription({ type: "answer", sdp: msg.sdp });
   }
 
@@ -99,11 +117,12 @@ export class Link {
     const msg = await decode(code);
     if (msg.app !== "qchess" || msg.kind !== "invite") throw new Error("not an invite code");
     const pc = this.#newPeer();
+    this.id = msg.id;
     pc.ondatachannel = (ev) => this.#bind(ev.channel);
     await pc.setRemoteDescription({ type: "offer", sdp: msg.sdp });
     await pc.setLocalDescription(await pc.createAnswer());
     await waitIce(pc);
-    return encode({ app: "qchess", kind: "reply", sdp: pc.localDescription.sdp });
+    return encode({ app: "qchess", kind: "reply", id: msg.id, sdp: pc.localDescription.sdp });
   }
 
   send(obj) {

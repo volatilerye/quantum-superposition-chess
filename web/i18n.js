@@ -13,26 +13,42 @@ const en = {
   optEngine: "vs CPU",
   optHuman: "Free play",
   optOnline: "vs Human (online)",
+  share:
+    "Share…",
+  copyReply:
+    "Copy reply link",
+  inviteReady:
+    "The invite link is ready",
+  relaying:
+    "Passing the reply to the page that made the invite…",
+  relayDone:
+    "Done! Close this tab and go back to the page where you made the invite.",
+  relayNoTab:
+    "Couldn't find the page that made the invite. Open this link in the same browser, while that page is still open.",
+  badLink:
+    "This link is not valid (it may be for an older invite)",
+  netUnstable:
+    " — connection unstable, waiting for your opponent…",
   onlineTitle: "Online game",
   onlineIntro:
-    "Your browsers connect to each other directly. Exchange the two codes below through any chat app. (A public STUN server is used only to find your network address; moves go straight between the two browsers. Some networks may block the connection.)",
-  tabHost: "Invite",
-  tabGuest: "Join",
-  hostStep1: "Create an invite code and send it (or the invite link) to your opponent.",
-  makeInvite: "Create invite code",
-  copyCode: "Copy code",
-  copyLink: "Copy invite link",
-  hostStep2: "Paste the reply code your opponent sends back, then connect.",
-  connect: "Connect",
-  guestStep1: "Paste the invite code you received (opening the invite link fills it in).",
-  makeReply: "Create reply code",
-  guestStep2: "Send this reply code back to your opponent and wait for the connection.",
+    "Your browsers connect to each other directly, with no game server in between. (A public STUN server is used only to find your network address. Some networks may block the connection.)",
+  hostStep1:
+    "Create an invite link and send it to your opponent (by chat, e-mail, etc.).",
+  makeInvite:
+    "Create invite link",
+  copyLink:
+    "Copy invite link",
+  hostStep2:
+    "Your opponent will send you a reply link. Open it in this same browser (not inside a chat app's built-in browser), and keep this page open until you're connected.",
+  guestStep1:
+    "Send this reply link back to the person who invited you.",
+  guestStep2:
+    "Then come back to this page right away and keep it open. On a phone, the connection pauses while the browser is in the background.",
   netWorking: "Preparing…",
   netWaiting: "Waiting for the connection…",
   netConnected: "Connected!",
   netClosed: "The connection to your opponent was closed",
   netFailed: "Could not connect: {msg}",
-  badCode: "This code is not valid",
   notConnected: "Not connected — press Start to connect",
   opponentTurn: "{color} to move (opponent)",
   hostOnly: "Only the player who sent the invite can start a new game",
@@ -178,26 +194,42 @@ const ja = {
   optEngine: "対CPU",
   optHuman: "フリープレイ",
   optOnline: "対人（オンライン）",
+  share:
+    "共有…",
+  copyReply:
+    "返信リンクをコピー",
+  inviteReady:
+    "招待リンクができました",
+  relaying:
+    "招待を作ったページに返信を渡しています…",
+  relayDone:
+    "完了しました！このタブを閉じて、招待を作ったページに戻ってください。",
+  relayNoTab:
+    "招待を作ったページが見つかりませんでした。そのページを開いたまま、同じブラウザでこのリンクを開いてください。",
+  badLink:
+    "このリンクは使えません（古い招待へのリンクかもしれません）",
+  netUnstable:
+    " — 接続が不安定です（相手を待っています…）",
   onlineTitle: "オンライン対戦",
   onlineIntro:
-    "お互いのブラウザを直接つなぎます。下の 2 つのコードを、チャットなどで相手とやり取りしてください（公開の STUN サーバーを、自分のネットワーク上の住所を調べるためだけに使います。手の内容はブラウザ同士で直接やり取りします。ネットワークによってはつながらないことがあります）。",
-  tabHost: "招待する",
-  tabGuest: "招待された",
-  hostStep1: "招待コードを作って、相手に送ります（招待リンクでも送れます）。",
-  makeInvite: "招待コードを作る",
-  copyCode: "コードをコピー",
-  copyLink: "招待リンクをコピー",
-  hostStep2: "相手から届いた返信コードを貼り付けて、接続します。",
-  connect: "接続",
-  guestStep1: "届いた招待コードを貼り付けます（招待リンクを開いた場合は入力済みです）。",
-  makeReply: "返信コードを作る",
-  guestStep2: "この返信コードを相手に送って、接続を待ちます。",
+    "お互いのブラウザを、ゲーム用のサーバーを通さずに直接つなぎます（自分のネットワーク上の住所を調べるためだけに公開の STUN サーバーを使います。ネットワークによってはつながらないことがあります）。",
+  hostStep1:
+    "招待リンクを作って、チャットやメールなどで相手に送ります。",
+  makeInvite:
+    "招待リンクを作る",
+  copyLink:
+    "招待リンクをコピー",
+  hostStep2:
+    "相手から返信リンクが届いたら、このページと同じブラウザで開いてください（チャットアプリの中のブラウザではなく）。つながるまで、このページは開いたままにしてください。",
+  guestStep1:
+    "この返信リンクを、招待してくれた相手に送り返します。",
+  guestStep2:
+    "送ったらすぐにこのページに戻って、開いたままにしてください（スマホではブラウザが裏にあるあいだ通信が止まります）。",
   netWorking: "準備中…",
   netWaiting: "接続を待っています…",
   netConnected: "接続しました！",
   netClosed: "相手との接続が切れました",
   netFailed: "接続できませんでした: {msg}",
-  badCode: "コードが正しくありません",
   notConnected: "未接続です（「対局開始」で接続します）",
   opponentTurn: "{color}番（相手）",
   hostOnly: "新しい対局は、招待した側だけが始められます",
