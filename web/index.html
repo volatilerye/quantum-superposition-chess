@@ -92,9 +92,17 @@
 
       <ol id="moves" class="moves"></ol>
 
-      <section class="rules small">
-        <h2 data-i18n="rules">Rules</h2>
-        <div class="rules-box" tabindex="0">
+      <button id="show-rules" class="rules-button" data-i18n="showRules">Rules</button>
+
+
+    </aside>
+  </main>
+
+  <div id="debug" class="debug" hidden></div>
+
+  <dialog id="rules-dialog" class="rules-dialog">
+    <h2 data-i18n="rules">Rules</h2>
+    <div class="rules-box small" tabindex="0">
           <ul class="rules-list">
             <li><strong data-i18n="rs_setup"></strong>
               <ul>
@@ -137,14 +145,9 @@
             </li>
           </ul>
           <p class="muted" data-i18n="hoverNote"></p>
-        </div>
-      </section>
-
-
-    </aside>
-  </main>
-
-  <div id="debug" class="debug" hidden></div>
+    </div>
+    <div class="rules-actions"><button id="close-rules" class="primary" data-i18n="close">Close</button></div>
+  </dialog>
 
   <dialog id="choice">
     <p id="choice-title"></p>

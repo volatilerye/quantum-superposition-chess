@@ -35,6 +35,8 @@ const en = {
   recordPrompt: "Game record",
 
   rules: "Rules",
+  showRules: "Show rules",
+  close: "Close",
   rs_setup: "Starting position",
   r_setup1:
     "Every piece is a superposition of pawn, knight, bishop, rook, queen and king.",
@@ -171,6 +173,8 @@ const ja = {
   recordPrompt: "棋譜",
 
   rules: "ルール",
+  showRules: "ルールを見る",
+  close: "閉じる",
   rs_setup: "初期配置",
   r_setup1:
     "すべての駒が、ポーン・ナイト・ビショップ・ルーク・クイーン・キングの重ね合わせです。",

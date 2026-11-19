@@ -752,6 +752,14 @@ function kifu() {
 }
 
 $("new-game").onclick = newGame;
+// ルールのダイアログ (閉じるボタン・枠の外のクリック・Esc で閉じる)
+$("show-rules").onclick = () => $("rules-dialog").showModal();
+$("close-rules").onclick = () => $("rules-dialog").close();
+$("rules-dialog").addEventListener("click", (ev) => {
+  const r = $("rules-dialog").getBoundingClientRect();
+  const outside = ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom;
+  if (ev.target === $("rules-dialog") && outside) $("rules-dialog").close();
+});
 $("undo").onclick = undo;
 $("flip").onclick = () => {
   state.flipped = !state.flipped;
