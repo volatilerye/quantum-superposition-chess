@@ -42,10 +42,10 @@ export class Engine {
     return this.ready;
   }
 
-  /** 初期配置 setup (rules.newGame と同じ) から棋譜 (手のコードの配列) を再生した局面を、ms ミリ秒まで、または深さ depth 手まで探索する */
-  async search(moves, ms, depth = 64, setup = 0) {
+  /** 棋譜 (手のコードの配列) の局面を ms ミリ秒まで、または深さ depth 手まで探索する */
+  async search(moves, ms, depth = 64) {
     await this.ready;
-    return this.#call({ type: "search", moves, ms, depth, setup });
+    return this.#call({ type: "search", moves, ms, depth });
   }
 
   /** 探索中なら打ち切る */

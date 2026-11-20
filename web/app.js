@@ -30,7 +30,6 @@ const state = {
   netUnstable: false, // オンライン対戦の接続が一時的に不安定 (相手のブラウザが裏に回ったときなど)
   inviteUrl: "", // 作った招待リンク
   replyUrl: "", // 作った返信リンク
-  setup: 0, // 初期配置 (ビット 0 = 白を通常のチェスの配置に、ビット 1 = 黒を通常のチェスの配置に)
   player: "w", // エンジン対局でのこちらの色
   flipped: false,
   selected: null,
@@ -46,7 +45,7 @@ const state = {
 };
 
 // ---- 設定の保存 ---------------------------------------------------------
-const SETTINGS = ["lang", "opponent", "setup", "color", "level", "guard", "overlay"];
+const SETTINGS = ["lang", "opponent", "color", "level", "guard", "overlay"];
 
 /**
  * 強さレベル n (1〜10): 「思考 n 秒以内」か「深さ n 手以内」の先に達した方で止める。
@@ -111,7 +110,7 @@ function playableMoves() {
   const { rules } = state;
   const all = rules.legalMoves();
   if (!$("guard").checked) return all;
-  const key = state.setup + "|" + rules.history().join(" ");
+  const key = rules.history().join(" ");
   if (playableCache.key === key) return playableCache.moves;
   const safe = all.filter((code) => {
     if (!rules.play(code)) return true;
@@ -655,7 +654,7 @@ async function maybeEngineMove() {
   const started = performance.now();
   let r;
   try {
-    r = await engine.search(rules.history(), ...levelLimits(), state.setup);
+    r = await engine.search(rules.history(), ...levelLimits());
   } catch (e) {
     if (token !== state.token) return; // 取り消し
     state.thinking = false;
@@ -707,7 +706,7 @@ document.addEventListener("keydown", (ev) => {
 async function analyze() {
   if (!state.debug || !state.analyzer || !state.rules) return;
   const hist = state.rules.history();
-  const key = state.setup + "|" + hist.join(" ") + "|" + state.rules.status();
+  const key = hist.join(" ") + "|" + state.rules.status();
   if (key === analysisKey) return;
   analysisKey = key;
   const box = $("debug");
@@ -719,7 +718,7 @@ async function analyze() {
   box.textContent = t("analyzing");
   const color = state.rules.turn();
   try {
-    const r = await state.analyzer.search(hist, ...ANALYSIS_LIMITS, state.setup);
+    const r = await state.analyzer.search(hist, ...ANALYSIS_LIMITS);
     if (key !== analysisKey) return;
     const m = r.move;
     const move = `${m.slice(0, 2)}-${m.slice(2, 4)}` + ({ q: "=Q", r: "=R", b: "=B", n: "=N", c: " (O-O)", e: " e.p." }[m[4]] ?? "");
@@ -735,8 +734,8 @@ const resolveColor = () => {
   return c === "r" ? (Math.random() < 0.5 ? "w" : "b") : c;
 };
 
-/** オンライン対戦の対局を始める (自分の色 player、初期配置 setup) */
-function startGame(setup, player) {
+/** オンライン対戦の対局を始める (自分の色 player) */
+function startGame(player) {
   cancelEngine();
   state.opponent = "online";
   state.player = player;
@@ -744,8 +743,7 @@ function startGame(setup, player) {
   state.selected = null;
   state.inspect = null;
   state.error = null;
-  state.setup = setup;
-  state.rules.newGame(setup);
+  state.rules.newGame();
   render();
   saveSettings();
 }
@@ -786,8 +784,7 @@ function newLink(role) {
 async function onRemoteMessage(msg) {
   const { rules } = state;
   if (msg.type === "start" && state.role === "guest") {
-    $("setup").value = String(msg.setup);
-    startGame(Number(msg.setup), msg.hostColor === "w" ? "b" : "w");
+    startGame(msg.hostColor === "w" ? "b" : "w");
   } else if (msg.type === "move" && onlineGame()) {
     if (msg.ply !== rules.history().length || rules.turn() === state.player || !rules.play(msg.code)) {
       state.error = { key: "errSync", vars: { move: msg.code } };
@@ -926,8 +923,8 @@ function newGame() {
     // 未接続なら接続のダイアログを開く。接続済みなら招待した側だけが新しい対局を始める
     if (!connected()) return openOnline();
     if (state.role !== "host") return;
-    startGame(Number($("setup").value), resolveColor());
-    state.link.send({ type: "start", setup: state.setup, hostColor: state.player });
+    startGame(resolveColor());
+    state.link.send({ type: "start", hostColor: state.player });
     return;
   }
   if (state.link) {
@@ -943,8 +940,7 @@ function newGame() {
   state.selected = null;
   state.inspect = null;
   state.error = null;
-  state.setup = Number($("setup").value);
-  state.rules.newGame(state.setup);
+  state.rules.newGame();
   render();
   saveSettings();
   maybeEngineMove();
@@ -983,7 +979,6 @@ function kifu() {
   const headers = [
     `[Event "Casual game"]`,
     `[Variant "Quantum superposition chess"]`,
-    `[Setup "${["both superposed", "white classical", "black classical", "both classical"][state.setup]}"]`,
     `[Date "${date}"]`,
     `[White "${name("w")}"]`,
     `[Black "${name("b")}"]`,
@@ -1039,8 +1034,7 @@ async function main() {
     return;
   }
   state.opponent = $("opponent").value;
-  state.setup = Number($("setup").value);
-  state.rules.newGame(state.setup);
+  state.rules.newGame();
   const c = $("color").value;
   state.player = c === "r" ? (Math.random() < 0.5 ? "w" : "b") : c;
   state.flipped = state.opponent === "engine" && state.player === "b";

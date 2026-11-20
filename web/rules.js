@@ -23,8 +23,7 @@ export async function loadRules(url) {
   const STATUS = ["ongoing", "checkmate", "stalemate", "fifty", "threefold", "insufficient", "kingCaptured", "kingRevealed", "annihilation"];
 
   return {
-    /** setup: ビット 0 = 白を通常のチェスの配置に、ビット 1 = 黒を通常のチェスの配置に (0 = 両方とも重ね合わせ) */
-    newGame: (setup = 0) => e.new_game(setup),
+    newGame: () => e.new_game(),
     /** 手 (e2e4 / 成り e7e8q / キャスリング e1g1c / アンパッサン e5d6e) を指す。成功なら表記、不正なら null */
     play: (code) => get(e.play(put(code))) || null,
     undo: () => e.undo() === 1,

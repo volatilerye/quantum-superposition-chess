@@ -200,23 +200,6 @@ impl Position {
         Position { pieces, board, stm: WHITE, ep: None, halfmove: 0, fullmove: 1 }
     }
 
-    /// 初期配置。`classical[c]` が true の色は通常のチェスの配置 (重ね合わせなし)、false なら全部の駒が重ね合わせ
-    pub fn start_with(classical: [bool; 2]) -> Self {
-        let mut p = Self::start();
-        const BACK: [u8; 8] = [R_, N_, B_, Q_, K_, B_, N_, R_];
-        for c in [WHITE, BLACK] {
-            if !classical[c as usize] {
-                continue;
-            }
-            for i in Self::ids(c) {
-                let pc = &mut p.pieces[i];
-                let (f, r) = (pc.sq % 8, pc.sq / 8);
-                pc.domain = if r == 1 || r == 6 { P_ } else { BACK[f as usize] };
-            }
-        }
-        // 片方だけ通常配置でも、もう片方は全種類の重ね合わせのまま (色ごとに独立)
-        p
-    }
 
     pub fn piece_at(&self, sq: u8) -> Option<usize> {
         match self.board[sq as usize] {
@@ -810,11 +793,6 @@ impl Default for Game {
 }
 
 impl Game {
-    /// 初期配置を指定して始める (Position::start_with)
-    pub fn with_setup(classical: [bool; 2]) -> Self {
-        Game { history: vec![Position::start_with(classical)], moves: vec![], notes: vec![] }
-    }
-
     pub fn pos(&self) -> &Position {
         self.history.last().unwrap()
     }
@@ -945,21 +923,6 @@ mod tests {
             p.prune(c);
         }
         p
-    }
-
-    #[test]
-    fn classical_setup() {
-        let mut g = Game::with_setup([true, false]);
-        assert_eq!(kinds_at(&g, "e1"), "K");
-        assert_eq!(kinds_at(&g, "b1"), "N");
-        assert_eq!(kinds_at(&g, "e2"), "P");
-        assert_eq!(kinds_at(&g, "e8"), "PNBRQK");
-        // 通常のチェスと同じ初手の数 (20 手)
-        assert_eq!(g.pos().legal_moves().len(), 20);
-        assert_eq!(g.play("e2e4").as_deref(), Some("e2-e4(P)"));
-        let g = Game::with_setup([true, true]);
-        assert!(!g.pos().in_check());
-        assert_eq!(g.status(), Status::Ongoing);
     }
 
     #[test]

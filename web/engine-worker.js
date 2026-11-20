@@ -11,7 +11,7 @@ self.onmessage = async (ev) => {
       rules = await loadRules(ev.data.wasm);
       self.postMessage({ id, ok: true });
     } else if (type === "search") {
-      rules.newGame(ev.data.setup ?? 0);
+      rules.newGame();
       for (const m of ev.data.moves) {
         if (!rules.play(m)) throw new Error(`failed to replay move: ${m}`);
       }

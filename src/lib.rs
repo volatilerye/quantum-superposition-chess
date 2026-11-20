@@ -63,10 +63,8 @@ pub extern "C" fn output_ptr() -> *const u8 {
 
 /// 初期局面 (全駒が重ね合わせ) から新しい対局を始める
 #[no_mangle]
-pub extern "C" fn new_game(setup: u32) {
-    // setup: ビット 0 = 白を通常のチェスの配置に、ビット 1 = 黒を通常のチェスの配置に (0 なら両方とも重ね合わせ)
-    let classical = [setup & 1 != 0, setup & 2 != 0];
-    unsafe { *G.game.get() = Some(Game::with_setup(classical)) };
+pub extern "C" fn new_game() {
+    unsafe { *G.game.get() = Some(Game::default()) };
 }
 
 /// 入力バッファの手 (e2e4 / e7e8q / e1g1c / e5d6e) を指す。成功なら表記を出力し長さを返す。不正手は 0
@@ -179,7 +177,7 @@ mod tests {
 
     #[test]
     fn ffi_flow() {
-        new_game(0);
+        new_game();
         assert_eq!(out(board()).split(' ').count(), 64);
         assert!(out(board()).starts_with("wpnbrqk "));
         assert_eq!(out(play(put("b1c3"))), "b1-c3(N)");

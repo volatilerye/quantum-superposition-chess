@@ -58,11 +58,6 @@ const en = {
   optWhite: "White (moves first)",
   optBlack: "Black (moves second)",
   optRandom: "Random",
-  setup: "Setup",
-  setup0: "Both superposed",
-  setup1: "Only White classical",
-  setup2: "Only Black classical",
-  setup3: "Both classical",
   start: "Start",
   engine: "CPU",
   strength: "Strength",
@@ -82,8 +77,6 @@ const en = {
   rs_setup: "Starting position",
   r_setup1:
     "Every piece is a superposition of pawn, knight, bishop, rook, queen and king.",
-  r_setup2:
-    "With the “Setup” option, either side (or both) can start from the classical chess position instead.",
   rs_super: "Moves and superposition",
   r_super1:
     "A piece moves as one of the kinds in its superposition.",
@@ -240,11 +233,6 @@ const ja = {
   optWhite: "白（先手）",
   optBlack: "黒（後手）",
   optRandom: "ランダム",
-  setup: "初期配置",
-  setup0: "両方とも重ね合わせ",
-  setup1: "白だけ通常配置",
-  setup2: "黒だけ通常配置",
-  setup3: "両方とも通常配置",
   start: "対局開始",
   engine: "CPU",
   strength: "強さ",
@@ -264,8 +252,6 @@ const ja = {
   rs_setup: "初期配置",
   r_setup1:
     "すべての駒が、ポーン・ナイト・ビショップ・ルーク・クイーン・キングの重ね合わせです。",
-  r_setup2:
-    "「初期配置」の設定で、どちらかの色（または両方）を通常のチェスの配置から始めることもできます。",
   rs_super: "動きと重ね合わせ",
   r_super1:
     "駒は、重ね合わせのうちどれか 1 種類として動きます。",
