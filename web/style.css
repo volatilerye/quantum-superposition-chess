@@ -209,8 +209,9 @@ fieldset {
 legend { color: var(--muted); font-size: 0.85rem; padding: 0 4px; }
 
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.check { display: flex; gap: 6px; align-items: flex-start; margin: -4px 0 8px; color: var(--muted); cursor: pointer; }
-.check input { margin: 2px 0 0; }
+/* チェックボックスの行 (盤のチェック表示 .sq.check と名前がぶつからないよう option-check にする) */
+.option-check { display: flex; gap: 6px; align-items: flex-start; margin: -4px 0 8px; color: var(--muted); cursor: pointer; }
+.option-check input { margin: 2px 0 0; }
 .row.buttons { margin-bottom: 10px; flex-wrap: nowrap; gap: 6px; }
 .row.buttons button { font-size: 0.85rem; padding: 5px 8px; white-space: nowrap; }
 .slider-box { margin: 2px 0 6px; }
