@@ -41,7 +41,6 @@ const state = {
   analyzer: null, // 評価・最善手用のエンジン (対局用とは別の Worker)
   animating: false, // 直前の手を段階的に見せている間は true (入力を受け付けない)
   error: null, // { key, vars } (言語を切り替えても訳し直せるようにキーで持つ)
-  cpuDepth: null, // CPU が直前の手で読んだ深さ { depth, ply } (ply はその手を指した後の手数)
 };
 
 // ---- 設定の保存 ---------------------------------------------------------
@@ -403,9 +402,7 @@ function renderStatus() {
     setStatus(t("opponentTurn", { color: colorName(turn) }) + (rules.inCheck() ? t("check") : ""));
   } else {
     const key = state.opponent === "human" ? "toMove" : "toMoveYou";
-    // CPU の直前の手が何手先まで読んで指したものか
-    const d = state.opponent === "engine" && state.cpuDepth?.ply === rules.history().length ? t("cpuDepth", state.cpuDepth) : "";
-    setStatus(t(key, { color: colorName(turn) }) + (rules.inCheck() ? t("check") : "") + d);
+    setStatus(t(key, { color: colorName(turn) }) + (rules.inCheck() ? t("check") : ""));
   }
   $("undo").disabled = rules.history().length === 0 || onlineGame();
   $("new-game").disabled = onlineGame() && connected() && state.role === "guest";
@@ -670,7 +667,6 @@ async function maybeEngineMove() {
   if (r && !rules.play(r.move)) {
     state.error = { key: "errIllegal", vars: { move: r.move } };
   } else if (r) {
-    state.cpuDepth = { depth: r.depth, ply: rules.history().length };
     await showLastMove();
     return;
   }
