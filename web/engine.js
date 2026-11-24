@@ -13,9 +13,10 @@ export class Engine {
   #spawn() {
     this.worker = new Worker(this.workerUrl, { type: "module" });
     this.worker.onmessage = (ev) => {
-      const { id, ok, result, error } = ev.data;
+      const { id, ok, result, error, progress } = ev.data;
       const p = this.pending.get(id);
       if (!p) return;
+      if (progress) return p.onProgress?.(progress); // 解析の途中経過
       this.pending.delete(id);
       if (ok) p.resolve(result);
       else p.reject(new Error(error));
@@ -25,10 +26,10 @@ export class Engine {
     this.ready.catch(() => {});
   }
 
-  #call(msg) {
+  #call(msg, onProgress) {
     const id = ++this.seq;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      this.pending.set(id, { resolve, reject, onProgress });
       this.worker.postMessage({ ...msg, id });
     });
   }
@@ -46,6 +47,12 @@ export class Engine {
   async search(moves, ms, depth = 64) {
     await this.ready;
     return this.#call({ type: "search", moves, ms, depth });
+  }
+
+  /** 局面を cancel() されるまで 1 手ずつ深く読み続け、深さが進むたびに onProgress({ move, score, depth }) を呼ぶ */
+  async analyze(moves, onProgress) {
+    await this.ready;
+    return this.#call({ type: "analyze", moves }, onProgress);
   }
 
   /** 探索中なら打ち切る */
